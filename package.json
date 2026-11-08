@@ -1,0 +1,42 @@
+{
+  "name": "@leocavalcante/pi-otel",
+  "version": "0.1.0",
+  "description": "Privacy-first OpenTelemetry for Pi Durable and Pi coding agents",
+  "type": "module",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/leocavalcante/pi-otel.git" },
+  "homepage": "https://github.com/leocavalcante/pi-otel#readme",
+  "bugs": "https://github.com/leocavalcante/pi-otel/issues",
+  "keywords": ["pi-package", "pi", "pi-durable", "opentelemetry", "otlp", "observability"],
+  "engines": { "node": ">=22.19.0" },
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }, "./extension": "./dist/extension.js", "./package.json": "./package.json" },
+  "pi": { "extensions": ["./src/extension.ts"] },
+  "files": ["dist", "src", "examples", "docs", "README.md", "LICENSE", "CHANGELOG.md"],
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "node --experimental-strip-types --import ./tests/environment.ts --test --test-concurrency=1 'tests/*.test.ts'"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/core": "3.1.0",
+    "@opentelemetry/resources": "3.1.0",
+    "@opentelemetry/sdk-trace": "3.1.0",
+    "@opentelemetry/sdk-metrics": "3.1.0",
+    "@opentelemetry/sdk-logs": "3.1.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.301.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.301.0",
+    "@opentelemetry/exporter-logs-otlp-http": "0.301.0"
+  },
+  "peerDependencies": { "@earendil-works/pi-telemetry": "^1.5.0", "@earendil-works/pi-coding-agent": "*" },
+  "peerDependenciesMeta": { "@earendil-works/pi-coding-agent": { "optional": true } },
+  "devDependencies": {
+    "@earendil-works/pi-telemetry": "1.5.0",
+    "@earendil-works/pi-durable": "1.5.0",
+    "@earendil-works/pi-ai": "1.5.0",
+    "@earendil-works/chord": "1.5.0",
+    "@earendil-works/pi-coding-agent": "1.5.0",
+    "@types/node": "22.19.1",
+    "typescript": "5.9.3"
+  }
+}
