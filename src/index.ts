@@ -8,6 +8,8 @@ import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import type { ExportResult } from '@opentelemetry/core';
 import type { TelemetryContext } from '@earendil-works/pi-telemetry';
+import type { Models } from '@earendil-works/pi-ai';
+import { withModelRuntimeTelemetry } from './model-runtime.ts';
 import { OtelAdapter } from './adapter.ts';
 import { SPANS, pick, safeSpan, metricAttributes, eventAttributes, errorCategory } from './privacy.ts';
 import { codingObserver, type CodingEvent, type CodingSource } from './coding.ts';
@@ -23,6 +25,8 @@ export interface UsageValue { input: number; output: number; cacheRead: number; 
 export interface UsageState { models: Readonly<Record<string, UsageValue>>; tools?: Readonly<Record<string, UsageValue>> }
 export interface PiOtel {
   readonly telemetry: TelemetryContext;
+  /** SDK ModelRuntime 1.5.0 compatibility. Do not wrap already-instrumented createModels(). */
+  modelRuntime<T extends Models>(runtime: T): T;
   /** Read totals through the existing owner only; never opens storage or another Harness. */
   observeDurable<C>(harness: { usage(context: C): Promise<UsageState> }, context: C): Promise<() => void>;
   observeCodingAgent(source: CodingSource): () => void;
@@ -56,7 +60,7 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
     'service.name': identity(options.serviceName ?? process.env.OTEL_SERVICE_NAME ?? 'pi-agent', 'service name'),
     'service.namespace': identity(options.serviceNamespace ?? envResource['service.namespace'] ?? 'agents', 'service namespace'),
     'service.version': identity(options.serviceVersion ?? envResource['service.version'] ?? 'unknown', 'service version'),
-    'service.instance.id': randomUUID(), 'telemetry.sdk.name': 'pi-otel', 'telemetry.sdk.version': '0.1.0',
+    'service.instance.id': randomUUID(), 'telemetry.sdk.name': 'pi-otel', 'telemetry.sdk.version': '0.1.1',
   });
   const interval = Number(process.env.OTEL_METRIC_EXPORT_INTERVAL ?? 15000);
   if (!Number.isFinite(interval) || interval < 1000) throw new Error('OTEL_METRIC_EXPORT_INTERVAL must be at least 1000 milliseconds.');
@@ -76,7 +80,7 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
       selectAggregationTemporality: kind => metricExporter.selectAggregationTemporality(kind), },
     exportIntervalMillis: interval, exportTimeoutMillis: Math.min(interval, 5000),
   })] });
-  const meter = meters.getMeter('@leocavalcante/pi-otel', '0.1.0');
+  const meter = meters.getMeter('@leocavalcante/pi-otel', '0.1.1');
   const exportErrors = meter.createCounter('pi.otel.export.errors');
   exporterError = signal => { exportFailures++; exportErrors.add(1, { signal }); };
   const traceExporter = new OTLPTraceExporter({ url: endpoint('traces', options.endpoint), timeoutMillis: 5000 });
@@ -95,12 +99,12 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
       shutdown: () => logExporter.shutdown(), forceFlush: () => logExporter.forceFlush() },
     maxQueueSize: 512, maxExportBatchSize: 128, scheduledDelayMillis: 1000, exportTimeoutMillis: 5000,
   })] });
-  const logger = logs.getLogger('@leocavalcante/pi-otel', '0.1.0');
+  const logger = logs.getLogger('@leocavalcante/pi-otel', '0.1.1');
   const tools = meter.createCounter('pi.otel.tool.attempts');
   const toolDuration = meter.createHistogram('pi.otel.tool.duration', { unit: 'ms', advice: {
     explicitBucketBoundaries: [1, 10, 50, 100, 500, 1000, 5000, 15000, 60000, 300000, 900000] } });
   const recovered = meter.createCounter('pi.otel.recovered.phases');
-  const telemetry = new OtelAdapter({ tracer: tracers.getTracer('@leocavalcante/pi-otel', '0.1.0'), meter, metricAttributes,
+  const telemetry = new OtelAdapter({ tracer: tracers.getTracer('@leocavalcante/pi-otel', '0.1.1'), meter, metricAttributes,
     onEvent: (name, attributes, context) => {
       const safe = eventAttributes(name, attributes);
       if (safe) logger.emit({ body: name, severityNumber: 9, attributes: safe, context });
@@ -141,6 +145,7 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
   let closing: Promise<boolean> | undefined;
   const api: PiOtel = {
     telemetry,
+    modelRuntime: runtime => withModelRuntimeTelemetry(runtime, telemetry),
     async observeDurable(harness, context) {
       if (disabled || closing) return () => {};
       let stopped = false; let reading = false;

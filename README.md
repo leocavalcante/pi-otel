@@ -10,7 +10,7 @@ Export model usage, timing, tool activity and lifecycle traces through OTLP/HTTP
 - Tested against Pi **1.5.0**. Other Pi versions are not verified.
 - An OTLP/HTTP receiver, normally an OpenTelemetry Collector.
 
-This is an early **0.1.0** project. The npm package is `@leocavalcante/pi-otel`.
+This is an early **0.1.1** project. The npm package is `@leocavalcante/pi-otel`.
 
 ## Pi coding-agent
 
@@ -64,7 +64,13 @@ await otel.shutdown();
 
 See a complete [model-free Durable example](examples/durable.ts). For coding-agent SDK sessions, call `otel.observeCodingAgent(session)` instead of installing the extension. Do not enable both for the same session. The returned function unsubscribes. Neither path observes work that happened before attachment.
 
-The returned object exposes `telemetry`, `observeDurable`, `observeCodingAgent`, `codingObserver`, `forceFlush()` and `shutdown()`. Flush/shutdown resolve to `false` on incomplete export rather than throwing backend failures into agent work. Configuration errors fail immediately with non-sensitive messages. Providers and lifecycle remain owned by the caller; no global API provider or ambient context manager is installed.
+### SDK ModelRuntime 1.5.0 compatibility
+
+That SDK runtime dispatches directly to providers instead of Pi AI's instrumented `Models` request path. Passing only `HarnessOptions.telemetry` therefore records Durable phases but misses AI request latency/tokens. If your Durable application uses **ModelRuntime 1.5.0**, pass `models: otel.modelRuntime(runtime)` to the same existing Harness. Wrap once. Do **not** wrap `createModels()`, which already emits native AI telemetry, or an unverified newer runtime.
+
+The compatibility facade uses Pi's public `lazyStream` observer and `AI_TELEMETRY_SCHEMA`. Catalog/auth/configuration methods stay bound to the original runtime. Model/context/options (including signal and auth overrides) are forwarded unchanged, one underlying call per request. Events and result objects are not replaced; no request retries or credential handling are added. Deferred pending polls record timing but not token/cost consumption.
+
+The returned object exposes `telemetry`, `modelRuntime`, `observeDurable`, `observeCodingAgent`, `codingObserver`, `forceFlush()` and `shutdown()`. Flush/shutdown resolve to `false` on incomplete export rather than throwing backend failures into agent work. Configuration errors fail immediately with non-sensitive messages. Providers and lifecycle remain owned by the caller; no global API provider or ambient context manager is installed.
 
 ## Configuration
 
@@ -114,6 +120,6 @@ npm run build
 npm pack --dry-run
 ```
 
-Tests include Pi's public adapter conformance suite, actual OTLP payload privacy checks, collector failure isolation, persistent-usage sampling, a real Durable Harness with a faux model/tool, and an actual coding-agent SDK extension lifecycle. They do not use paid models or production state. No process-crash recovery or arbitrary Pi-version compatibility claim is made.
+Tests include Pi's public adapter conformance suite, actual OTLP payload privacy checks, collector failure isolation, persistent-usage sampling, real Durable Harnesses with both native Models and SDK ModelRuntime faux-model tools, forwarding/result-identity and deferred-poll checks, and an actual coding-agent SDK extension lifecycle. They do not use paid models or production state. No process-crash recovery or arbitrary Pi-version compatibility claim is made.
 
 MIT licensed. npm publication and releases are separate from repository availability.

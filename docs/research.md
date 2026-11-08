@@ -26,6 +26,7 @@ OTLP traces, metrics and logs are interoperable wire protocols. GenAI naming con
 - Native error text can contain user/provider data even if truncated. Export must drop it.
 - Durable local usage accounting is stronger than best-effort exported counters.
 - Coding hooks expose a message lifecycle, not all native provider request internals.
+- SDK ModelRuntime 1.5.0 directly calls provider streams, bypassing the native `Models` AI observer. A real SDK-Harness regression produced zero AI spans for two faux requests before the explicit compatibility facade; with it, two spans and two duration observations are recorded. This is a distinction between request paths on the same release, not evidence of a regression between releases.
 - Conversation watching is UI state, not a replay-safe usage ledger.
 - A collector protocol fixture alone does not establish real Pi integration. The test suite also runs the actual Durable and coding-agent runtimes with faux providers and harmless tools.
 

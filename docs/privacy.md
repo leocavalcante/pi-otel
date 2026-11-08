@@ -8,6 +8,8 @@ The adapter records operational metadata, not model or tool content. No automati
 
 Lifecycle log bodies are fixed span names with `.completed`. Attributes come from the same allowlist. The coding observer reads only event type, role, provider/model, usage, stop reason, tool identifier, duration, outcome and abort metadata. It never stores or projects message content, tool args/results, deltas or error text.
 
+The explicit SDK ModelRuntime facade observes the existing public lazy-stream forwarding path, reads only timing/usage/block metadata and never retains deltas, message bodies or auth overrides. It does not implement authentication or retry operations.
+
 The generic callback adapter temporarily holds explicit Pi metadata for contract conformance; export-time filtering is the outbound security boundary. Private free-form errors supplied by Pi do not reach OTLP.
 
 Resource attributes are limited to service name/namespace/version, a random process instance ID, and adapter identification. Environment, host name, process arguments, filesystem paths and arbitrary `OTEL_RESOURCE_ATTRIBUTES` are not automatically detected. OTLP authentication headers remain transport configuration, never resource fields or log attributes.
