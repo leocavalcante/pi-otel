@@ -10,17 +10,19 @@ Export model usage, timing, tool activity and lifecycle traces through OTLP/HTTP
 - Tested against Pi **1.5.0**. Other Pi versions are not verified.
 - An OTLP/HTTP receiver, normally an OpenTelemetry Collector.
 
-This is an early **0.1.0** project. The npm name is `@leocavalcante/pi-otel`, but **no npm registry release is available yet**.
+This is an early **0.1.0** project. The npm package is `@leocavalcante/pi-otel`.
 
 ## Pi coding-agent
 
-Install the source package through Pi:
+Install the package through Pi:
 
 ```sh
-pi install git:github.com/leocavalcante/pi-otel
+pi install npm:@leocavalcante/pi-otel
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
   OTEL_SERVICE_NAME=pi-coding-agent pi
 ```
+
+To track source instead, use `pi install git:github.com/leocavalcante/pi-otel`.
 
 The extension is inert unless `OTEL_EXPORTER_OTLP_ENDPOINT` is explicitly set. It observes lifecycle events, never changes prompts or tools, and flushes on `session_shutdown`. Set `OTEL_SDK_DISABLED=true` to disable it.
 
@@ -28,7 +30,7 @@ Coding-agent model spans measure the assistant-message lifecycle. They are named
 
 ## Durable and SDK applications
 
-Until an npm release exists, build a local checkout:
+Install the SDK with `npm install @leocavalcante/pi-otel`. To build from source:
 
 ```sh
 git clone https://github.com/leocavalcante/pi-otel.git

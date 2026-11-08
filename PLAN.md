@@ -24,4 +24,4 @@ No agent framework, storage migration, credential gateway, shared inference loop
 - Durable tool-result outcomes distinct from phase outcomes.
 - Restart-correct end-to-end queue/submission latency.
 - Process-crash recovery tests and wider version compatibility.
-- Published npm packages.
+- Automated OIDC releases (0.1.0 was interactively bootstrapped).
