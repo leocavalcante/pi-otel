@@ -10,7 +10,7 @@ Export model usage, timing, tool activity and lifecycle traces through OTLP/HTTP
 - Tested against Pi **1.5.0**. Other Pi versions are not verified.
 - An OTLP/HTTP receiver, normally an OpenTelemetry Collector.
 
-This is an early **0.1.1** project, published as [`@leocavalcante/pi-otel`](https://www.npmjs.com/package/@leocavalcante/pi-otel/v/0.1.1). The npm release includes the SDK ModelRuntime compatibility fix.
+This is an early project, distributed as [`@leocavalcante/pi-otel`](https://www.npmjs.com/package/@leocavalcante/pi-otel). See the [changelog](CHANGELOG.md) for source changes.
 
 ## Pi coding-agent
 
