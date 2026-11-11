@@ -158,7 +158,7 @@ Workflows use the `.yaml` extension. `ci.yaml` runs on pull requests, whenever `
 | `required`  | Always                               | Fails if any job above failed or was cancelled. It's the only required CI check.                                                 |
 
 - Repository-specific jobs go in the same file and in `required.needs`. Examples: tmux builds, Windows process supervision, older Pi pins.
-- `pr-title.yaml` checks that pull request titles are Conventional Commits, because each squash commit title becomes a release note.
+- `pr-title.yaml` checks that pull request titles are Conventional Commits, because each squash commit title becomes a release note. Titles are limited to 72 characters, except Dependabot's, which are longer but still conventional.
 - **Hygiene (MUST):**
   - Pin actions to full commit SHAs, with a version comment.
   - Default workflows to `permissions: contents: read`.
@@ -196,8 +196,9 @@ Workflows use the `.yaml` extension. `ci.yaml` runs on pull requests, whenever `
   - As a result, no bot needs to bypass branch protection and no token is stored.
 - **Changelog format (MUST).** Headings look like `## [X.Y.Z] - YYYY-MM-DD`, which Pi parses. Pi adds the package name to each heading and renders the notes in the terminal. Use absolute links only. Entries come from PR titles, so write them for users (§10, rule 11).
 - **npm setup for each package:**
-  - A trusted publisher for `cd.yaml` with the `npm` environment.
-  - Publishing access set to "require 2FA and disallow tokens".
+  - A trusted publisher for `cd.yaml` with the `npm` environment, allowing `npm publish`. A new trusted publisher expires unless it completes a publish within 2 days, so create it right before merging a releasable change.
+  - `npm trust` commands, including `npm trust list`, need a 2FA approval in the browser. Don't pass `--json`: npm then holds back the approval link until the command ends.
+  - Publishing access set to "require 2FA and disallow tokens", once the first trusted publish has succeeded. Trusted publishing keeps working, because it doesn't use tokens.
   - No `NPM_TOKEN` anywhere. Nobody publishes from a laptop.
 - **Recovery.** Check npm first after a failed release. If the version is absent, an administrator may delete only the failed tag and re-run CD after fixing the cause. If npm already has the version, never delete its tag or republish it: verify provenance and restore a missing GitHub release from that tag. Package fixes need a new version.
 - **Git installs** (`pi install git:github.com/leocavalcante/pi-<name>`) track `main` and report `0.0.0-development`, so Pi doesn't show update notes for them. npm is the release channel.
@@ -289,16 +290,16 @@ Never pin a version in an install command, because Pi never updates npm packages
 
 ## 11. GitHub settings
 
-| Area          | Setting                                                                                                                                                                                                                          |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| About         | Description (§2), topics, and website (the gallery page)                                                                                                                                                                         |
-| Features      | Issues on. Wiki, Projects, and Discussions off.                                                                                                                                                                                  |
-| Merging       | Squash merges only. The commit title comes from the PR title, and the message from the commit messages, which keeps the `Signed-off-by` lines. Turn on auto-merge, "always suggest updating", and deleting branches after merge. |
-| Sign-off      | Require sign-off on web commits.                                                                                                                                                                                                 |
-| Code security | Dependabot alerts and security updates; secret scanning with push protection; private vulnerability reporting; CodeQL default setup.                                                                                             |
-| Actions       | Read-only default token. Actions can't approve PRs. Actions must be pinned to full SHAs.                                                                                                                                         |
-| Environment   | `npm`, deployable from `main` only.                                                                                                                                                                                              |
-| Labels        | GitHub and Dependabot defaults, plus `breaking-change`, `needs-repro`, `pi-compat`, `release`, and `security`.                                                                                                                   |
+| Area          | Setting                                                                                                                                                                                                                                                                      |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| About         | Description (§2), topics, and website (the gallery page)                                                                                                                                                                                                                     |
+| Features      | Issues on. Wiki, Projects, and Discussions off.                                                                                                                                                                                                                              |
+| Merging       | Squash merges only. The commit title comes from the PR title, and the message from the commit messages, which keeps the `Signed-off-by` lines. Turn on auto-merge, "always suggest updating", and deleting branches after merge.                                             |
+| Sign-off      | Require sign-off on web commits.                                                                                                                                                                                                                                             |
+| Code security | Dependabot alerts and security updates; secret scanning with push protection; private vulnerability reporting; CodeQL default setup. Once workflows exist, CodeQL also scans the `actions` language; a pull request analyzed before that needs a new commit to be rescanned. |
+| Actions       | Read-only default token. Actions can't approve PRs. Actions must be pinned to full SHAs.                                                                                                                                                                                     |
+| Environment   | `npm`, deployable from `main` only.                                                                                                                                                                                                                                          |
+| Labels        | GitHub and Dependabot defaults, plus `breaking-change`, `needs-repro`, `pi-compat`, `release`, and `security`.                                                                                                                                                               |
 
 **Rulesets:**
 
@@ -508,10 +509,17 @@ concurrency:
 jobs:
   ci:
     uses: ./.github/workflows/ci.yaml
+    # A called workflow can't request more than its caller grants. The weekly
+    # canary in ci.yaml opens issues, so grant that here or the whole run fails.
+    permissions:
+      contents: read
+      issues: write
 
   release:
+    if: github.ref == 'refs/heads/main'
     needs: ci
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     environment: npm
     permissions:
       contents: write # tags and GitHub releases
@@ -558,7 +566,8 @@ jobs:
       "@semantic-release/exec",
       {
         "generateNotesCmd": "bunx --no-install git-cliff --unreleased --tag v${nextRelease.version} --strip all",
-        "prepareCmd": "bunx --no-install git-cliff --tag v${nextRelease.version} --output CHANGELOG.md"
+        "prepareCmd": "bunx --no-install git-cliff --tag v${nextRelease.version} --output CHANGELOG.md",
+        "successCmd": "node .github/scripts/verify-published.mjs ${nextRelease.version}"
       }
     ],
     "@semantic-release/npm",
@@ -567,7 +576,9 @@ jobs:
 }
 ```
 
-Remove the `breaking` rule when the extension reaches 1.0. The devDependencies are `semantic-release`, `@semantic-release/exec`, `conventional-changelog-conventionalcommits`, and `git-cliff`, all with exact versions.
+Remove the `breaking` rule when the extension reaches 1.0. The devDependencies are `semantic-release`, `@semantic-release/commit-analyzer`, `@semantic-release/exec`, `@semantic-release/npm`, `@semantic-release/github`, `conventional-changelog-conventionalcommits`, and `git-cliff`, all with exact versions. `@semantic-release/npm` installs an npm CLI that supports trusted publishing; the release job runs it with lifecycle scripts disabled and builds explicitly beforehand.
+
+`.github/scripts/verify-published.mjs` polls the registry for up to two minutes after publishing and fails the release if the version or its SLSA provenance doesn't appear. pi-otel has the reference copy.
 
 ### A.7 cliff.toml (essentials)
 
