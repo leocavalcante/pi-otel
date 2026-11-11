@@ -317,7 +317,7 @@ Never pin a version in an install command, because Pi never updates npm packages
 - [ ] Least-privilege `permissions`; `id-token: write` only in the release job
 - [ ] `persist-credentials: false`, `bun install --frozen-lockfile`, and dependency install scripts blocked
 - [ ] actionlint and zizmor on workflows; gitleaks; GitHub secret scanning with push protection
-- [ ] `bun audit`; Dependabot for `bun` and `github-actions`, grouped, with a 5-day cooldown (Pi packages exempt)
+- [ ] `bun audit`; Dependabot for `bun` and `github-actions`, grouped, with a 7-day cooldown (Pi packages exempt)
 - [ ] CodeQL default setup, private vulnerability reporting, and deprecated `0.0.0-stage` bootstrap versions
 
 ## 13. Runtime conventions
@@ -611,7 +611,7 @@ updates:
     open-pull-requests-limit: 5
     versioning-strategy: increase
     commit-message: { prefix: "fix(deps)", prefix-development: "chore(deps)" }
-    cooldown: { default-days: 5, exclude: ["@earendil-works/*"] }
+    cooldown: { default-days: 7, exclude: ["@earendil-works/*"] }
     ignore:
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
@@ -646,6 +646,7 @@ updates:
     schedule:
       { interval: weekly, day: monday, time: "09:00", timezone: Etc/UTC }
     commit-message: { prefix: "ci(deps)" }
+    cooldown: { default-days: 7 }
     groups:
       actions: { patterns: ["*"] }
 ```

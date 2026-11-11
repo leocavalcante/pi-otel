@@ -13,7 +13,7 @@ updates:
       prefix: "fix(deps)"
       prefix-development: "chore(deps)"
     cooldown:
-      default-days: 5
+      default-days: 7
       exclude: ["@earendil-works/*"]
     ignore:
       - dependency-name: "@types/node"
@@ -52,6 +52,8 @@ updates:
       timezone: Etc/UTC
     commit-message:
       prefix: "ci(deps)"
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]
