@@ -94,16 +94,16 @@ This standard applies to pi-a2a, pi-otel, pi-subagents, pi-tmux, and every new P
 
 **Scripts (MUST use these names):**
 
-| Script              | Runs                                                                                                                                       |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `check`             | `tsc -p tsconfig.json && tsc -p tests`                                                                                                     |
-| `lint`              | `prettier --check . && eslint .`                                                                                                           |
-| `format`            | `prettier --write . && eslint --fix .`                                                                                                     |
-| `test`              | `bun run test:bun && bun run test:node`                                                                                                    |
-| `test:bun`          | `bun test --timeout 30000`. Bun's 5-second default is too short for integration tests, and `bunfig.toml` can't change it.                  |
-| `test:node`         | `node --import jiti/register --test "tests/**/*.node-test.ts"`                                                                             |
-| `verify`            | `lint`, `check`, `test`, `build` if present, `bun audit`, `publint`, and `npm pack --dry-run`. These are the CI gates, run on one machine. |
-| `build` + `prepack` | SDK packages only: `tsc -p tsconfig.build.json`                                                                                            |
+| Script              | Runs                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check`             | `tsc -p tsconfig.json && tsc -p tests`                                                                                                                        |
+| `lint`              | `prettier --check . && eslint .`                                                                                                                              |
+| `format`            | `prettier --write . && eslint --fix .`                                                                                                                        |
+| `test`              | `bun run test:bun && bun run test:node`                                                                                                                       |
+| `test:bun`          | `bun test --timeout 30000`. Bun's 5-second default is too short for integration tests, and `bunfig.toml` can't change it.                                     |
+| `test:node`         | `node --import jiti/register --test "tests/**/*.node-test.ts"`                                                                                                |
+| `verify`            | `lint`, `check`, `test`, `build` if present, `bun audit --audit-level=high`, `publint`, and `npm pack --dry-run`. These are the CI gates, run on one machine. |
+| `build` + `prepack` | SDK packages only: `tsc -p tsconfig.build.json`                                                                                                               |
 
 **Pi manifest:** `"pi": { "extensions": ["./src/extension.ts"] }`, plus `pi.image` (SHOULD).
 
@@ -147,15 +147,15 @@ tsconfig.json  [tsconfig.build.json]
 
 Workflows use the `.yaml` extension. `ci.yaml` runs on pull requests, whenever `cd.yaml` calls it, on demand, and once a week.
 
-| Job         | Runs on                              | What it does                                                                                                  |
-| ----------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `static`    | Ubuntu                               | `bun run lint`, `bun run check`, `bun audit`, publint, actionlint, zizmor, and gitleaks over the full history |
-| `test`      | Ubuntu, macOS, Windows               | `bun run test` (both lanes)                                                                                   |
-| `node`      | Ubuntu × Node.js 22.19.0, 22, 24, 26 | `bun run test:node`                                                                                           |
-| `pi-min`    | Ubuntu, Node.js 22.19.0              | Both lanes against the minimum supported Pi version                                                           |
-| `package`   | Ubuntu                               | Packs, inspects, installs, and imports the package under Node.js                                              |
-| `pi-canary` | Weekly and on demand                 | Both lanes against the latest Pi; opens or updates a `pi-compat` issue when they fail                         |
-| `required`  | Always                               | Fails if any job above failed or was cancelled. It's the only required CI check.                              |
+| Job         | Runs on                              | What it does                                                                                                                     |
+| ----------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `static`    | Ubuntu                               | `bun run lint`, `bun run check`, `bun audit --audit-level=high`, publint, actionlint, zizmor, and gitleaks over the full history |
+| `test`      | Ubuntu, macOS, Windows               | `bun run test` (both lanes)                                                                                                      |
+| `node`      | Ubuntu × Node.js 22.19.0, 22, 24, 26 | `bun run test:node`                                                                                                              |
+| `pi-min`    | Ubuntu, Node.js 22.19.0              | Both lanes against the minimum supported Pi version                                                                              |
+| `package`   | Ubuntu                               | Packs, inspects, installs, and imports the package under Node.js                                                                 |
+| `pi-canary` | Weekly and on demand                 | Both lanes against the latest Pi; opens or updates a `pi-compat` issue when they fail                                            |
+| `required`  | Always                               | Fails if any job above failed or was cancelled. It's the only required CI check.                                                 |
 
 - Repository-specific jobs go in the same file and in `required.needs`. Examples: tmux builds, Windows process supervision, older Pi pins.
 - `pr-title.yaml` checks that pull request titles are Conventional Commits, because each squash commit title becomes a release note.
@@ -199,7 +199,7 @@ Workflows use the `.yaml` extension. `ci.yaml` runs on pull requests, whenever `
   - A trusted publisher for `cd.yaml` with the `npm` environment.
   - Publishing access set to "require 2FA and disallow tokens".
   - No `NPM_TOKEN` anywhere. Nobody publishes from a laptop.
-- **Recovery.** If publishing fails after the tag was pushed, a re-run sees the tag and does nothing. Delete the tag, then re-run `cd.yaml`. Repository admins can bypass the tag ruleset for this.
+- **Recovery.** Check npm first after a failed release. If the version is absent, an administrator may delete only the failed tag and re-run CD after fixing the cause. If npm already has the version, never delete its tag or republish it: verify provenance and restore a missing GitHub release from that tag. Package fixes need a new version.
 - **Git installs** (`pi install git:github.com/leocavalcante/pi-<name>`) track `main` and report `0.0.0-development`, so Pi doesn't show update notes for them. npm is the release channel.
 
 ## 9. Documentation
@@ -317,7 +317,7 @@ Never pin a version in an install command, because Pi never updates npm packages
 - [ ] Least-privilege `permissions`; `id-token: write` only in the release job
 - [ ] `persist-credentials: false`, `bun install --frozen-lockfile`, and dependency install scripts blocked
 - [ ] actionlint and zizmor on workflows; gitleaks; GitHub secret scanning with push protection
-- [ ] `bun audit`; Dependabot for `bun` and `github-actions`, grouped, with a 7-day cooldown (Pi packages exempt)
+- [ ] `bun audit --audit-level=high` blocks high/critical findings; `bun audit` and Dependabot surface all severities. Dependabot for `bun` and `github-actions`, grouped, with a 7-day cooldown (Pi packages exempt)
 - [ ] CodeQL default setup, private vulnerability reporting, and deprecated `0.0.0-stage` bootstrap versions
 
 ## 13. Runtime conventions
@@ -472,7 +472,7 @@ export default defineConfig(
     "test": "bun run test:bun && bun run test:node",
     "test:bun": "bun test --timeout 30000",
     "test:node": "node --import jiti/register --test \"tests/**/*.node-test.ts\"",
-    "verify": "bun run lint && bun run check && bun run test && bun audit && publint && npm pack --dry-run"
+    "verify": "bun run lint && bun run check && bun run test && bun audit --audit-level=high && publint && npm pack --dry-run"
   },
   "peerDependencies": { "@earendil-works/pi-coding-agent": "*" },
   "devDependencies": { "<all exact>": "<x.y.z>" },
@@ -518,6 +518,8 @@ jobs:
       issues: write # release comments and failure issues
       pull-requests: write # "released in" comments
       id-token: write # npm Trusted Publishing and provenance
+    env:
+      NPM_CONFIG_IGNORE_SCRIPTS: "true"
     steps:
       - uses: actions/checkout@<sha> # v7.x
         with:
@@ -529,7 +531,7 @@ jobs:
           node-version: 24
       - run: bun install --frozen-lockfile
       - run: bun run --if-present build
-      - run: bunx semantic-release # runs on Node.js through its shebang
+      - run: bunx --no-install semantic-release # runs on Node.js through its shebang
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -547,6 +549,7 @@ jobs:
         "preset": "conventionalcommits",
         "releaseRules": [
           { "breaking": true, "release": "minor" },
+          { "type": "revert", "release": "patch" },
           { "type": "docs", "scope": "readme", "release": "patch" }
         ]
       }
@@ -554,8 +557,8 @@ jobs:
     [
       "@semantic-release/exec",
       {
-        "generateNotesCmd": "bunx git-cliff --unreleased --tag v${nextRelease.version} --strip all",
-        "prepareCmd": "bunx git-cliff --tag v${nextRelease.version} --output CHANGELOG.md"
+        "generateNotesCmd": "bunx --no-install git-cliff --unreleased --tag v${nextRelease.version} --strip all",
+        "prepareCmd": "bunx --no-install git-cliff --tag v${nextRelease.version} --output CHANGELOG.md"
       }
     ],
     "@semantic-release/npm",

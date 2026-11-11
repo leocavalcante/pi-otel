@@ -1,18 +1,33 @@
 {
   "name": "@leocavalcante/pi-otel",
-  "version": "0.1.2",
+  "version": "0.0.0-development",
   "description": "Export metadata-only OpenTelemetry from Pi coding-agent sessions and Pi Durable agents.",
   "type": "module",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/leocavalcante/pi-otel.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leocavalcante/pi-otel.git"
+  },
   "homepage": "https://github.com/leocavalcante/pi-otel#readme",
   "bugs": "https://github.com/leocavalcante/pi-otel/issues",
   "keywords": ["pi-extension", "pi-package", "pi-coding-agent", "pi-durable", "opentelemetry", "otlp", "observability", "llm-observability", "tracing", "telemetry"],
-  "engines": { "node": ">=22.19.0" },
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }, "./extension": "./dist/extension.js", "./package.json": "./package.json" },
-  "pi": { "extensions": ["./src/extension.ts"] },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./extension": "./dist/extension.js",
+    "./package.json": "./package.json"
+  },
+  "pi": {
+    "extensions": ["./src/extension.ts"]
+  },
   "packageManager": "bun@1.4.4",
   "trustedDependencies": [],
+  "publishConfig": { "access": "public", "provenance": true },
   "files": ["dist", "src", "examples", "docs", "README.md", "LICENSE", "CHANGELOG.md"],
   "scripts": {
     "check": "tsc -p tsconfig.json && tsc -p tests && tsc -p examples",
@@ -20,8 +35,9 @@
     "test": "bun run test:bun && bun run test:node",
     "test:bun": "bun test --timeout 30000 --preload ./tests/environment.ts",
     "test:node": "node --import ./tests/environment.ts --import jiti/register --test --test-concurrency=1 tests/*.node-test.ts",
-    "check:package": "bun run build && publint && node .github/scripts/check-package.mjs",
-    "verify": "bun run check && bun run test && bun run check:package && bun audit"
+    "changelog": "git-cliff --output CHANGELOG.md",
+    "check:package": "bun run build && bun run changelog && publint && node .github/scripts/check-package.mjs",
+    "verify": "bun run check && bun run test && bun run check:package && bun audit --audit-level=high"
   },
   "dependencies": {
     "@earendil-works/pi-telemetry": "1.5.0",
@@ -35,17 +51,31 @@
     "@opentelemetry/exporter-metrics-otlp-http": "0.301.0",
     "@opentelemetry/exporter-logs-otlp-http": "0.301.0"
   },
-  "peerDependencies": { "@earendil-works/pi-ai": "^1.5.0", "@earendil-works/pi-coding-agent": "*" },
-  "peerDependenciesMeta": { "@earendil-works/pi-coding-agent": { "optional": true } },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "^1.5.0",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    }
+  },
   "devDependencies": {
-    "@earendil-works/pi-durable": "1.5.2",
-    "@earendil-works/pi-ai": "1.5.2",
     "@earendil-works/chord": "1.5.2",
+    "@earendil-works/pi-ai": "1.5.2",
     "@earendil-works/pi-coding-agent": "1.5.2",
+    "@earendil-works/pi-durable": "1.5.2",
+    "@semantic-release/commit-analyzer": "13.0.1",
+    "@semantic-release/exec": "7.1.0",
+    "@semantic-release/github": "12.0.10",
+    "@semantic-release/npm": "13.2.0",
     "@types/bun": "1.4.4",
     "@types/node": "22.19.1",
+    "conventional-changelog-conventionalcommits": "10.4.1",
+    "git-cliff": "2.14.2",
     "jiti": "2.7.0",
     "publint": "0.3.25",
+    "semantic-release": "25.0.9",
     "typescript": "6.0.3",
     "yaml": "2.9.1"
   }

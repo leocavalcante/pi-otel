@@ -10,7 +10,7 @@ Export model usage, timing, tool activity and lifecycle traces through OTLP/HTTP
 - Requires Pi **1.5.0** or newer; development and CI use Pi **1.5.2** and also test the minimum version.
 - An OTLP/HTTP receiver, normally an OpenTelemetry Collector.
 
-This is an early project, distributed as [`@leocavalcante/pi-otel`](https://www.npmjs.com/package/@leocavalcante/pi-otel). See the [changelog](CHANGELOG.md) for source changes.
+This is an early project, distributed as [`@leocavalcante/pi-otel`](https://www.npmjs.com/package/@leocavalcante/pi-otel). See [GitHub releases](https://github.com/leocavalcante/pi-otel/releases) for release notes.
 
 ## Pi coding-agent
 
@@ -35,8 +35,8 @@ Install the SDK with `npm install @leocavalcante/pi-otel`. To build from source:
 ```sh
 git clone https://github.com/leocavalcante/pi-otel.git
 cd pi-otel
-npm ci --ignore-scripts
-npm run build
+bun install --frozen-lockfile
+bun run build
 ```
 
 Another application can install that built directory with `npm install /path/to/pi-otel --ignore-scripts`.
@@ -121,4 +121,8 @@ Tests include Pi's public adapter conformance suite, actual OTLP payload privacy
 
 Development uses Bun 1.4.4 and TypeScript 6.0.3; Pi still runs the extension on Node.js. `bun run test` runs the Bun suite and a separate Node.js load test. Tests clear inherited OpenTelemetry settings before running.
 
-MIT licensed. npm publication and releases are separate from repository availability.
+Merging a releasable Conventional Commit to `main` runs `.github/workflows/cd.yaml`, which publishes to npm with provenance and creates a GitHub release. The version on `main` is `0.0.0-development`; release versions live in tags and npm. GitHub installations track development source and do not receive Pi's package update notes.
+
+For release setup and recovery, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+MIT licensed.
