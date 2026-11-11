@@ -573,31 +573,35 @@ Remove the `breaking` rule when the extension reaches 1.0. The devDependencies a
 
 ```toml
 [changelog]
-header = "# Changelog\n"
-body = """
+header = "# Changelog\n\n"
+body = '''
 {% if version %}## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}{% else %}## [Unreleased]{% endif %}
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group | striptags | trim }}
-{% for commit in commits %}
-- {% if commit.breaking %}**Breaking:** {% endif %}{{ commit.message | split(pat="\n") | first | upper_first }}{% endfor %}
+{% for commit in commits -%}
+- {% if commit.breaking %}**Breaking:** {% endif %}{{ commit.message | split(pat="\n") | first | upper_first }}
 {% endfor %}
-"""
+{% endfor %}
+'''
 trim = true
 
 [git]
 conventional_commits = true
 filter_unconventional = true
-tag_pattern = "v[0-9]+\\.[0-9]+\\.[0-9]+"
+protect_breaking_commits = true
+use_branch_tags = true
+tag_pattern = '^v[0-9]+\.[0-9]+\.[0-9]+$'
 commit_preprocessors = [
-  { pattern = "\\(#([0-9]+)\\)", replace = "([#${1}](https://github.com/leocavalcante/pi-<name>/pull/${1}))" },
+  { pattern = '\(#([0-9]+)\)', replace = '([#${1}](https://github.com/leocavalcante/pi-<name>/pull/${1}))' },
 ]
 commit_parsers = [
-  { message = "^feat", group = "<!-- 0 -->Features" },
-  { message = "^fix\\(deps\\)", group = "<!-- 3 -->Dependencies" },
-  { message = "^fix", group = "<!-- 1 -->Fixes" },
-  { message = "^perf", group = "<!-- 2 -->Performance" },
-  { message = "^revert", group = "<!-- 4 -->Reverts" },
-  { message = "^docs\\(readme\\)", group = "<!-- 5 -->Documentation" },
+  { field = "breaking", pattern = "true", group = "<!-- 0 -->Breaking changes" },
+  { message = "^feat", group = "<!-- 1 -->Features" },
+  { message = '^fix\(deps\)', group = "<!-- 4 -->Dependencies" },
+  { message = "^fix", group = "<!-- 2 -->Fixes" },
+  { message = "^perf", group = "<!-- 3 -->Performance" },
+  { message = "^revert", group = "<!-- 5 -->Reverts" },
+  { message = '^docs\(readme\)', group = "<!-- 6 -->Documentation" },
   { message = ".*", skip = true },
 ]
 ```
