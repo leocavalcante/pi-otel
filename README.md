@@ -1,13 +1,13 @@
 # pi-otel
 
-Metadata-only OpenTelemetry for [Pi Durable](https://github.com/earendil-works/pi/tree/v1.5.0/packages/durable) and [Pi coding-agent](https://github.com/earendil-works/pi/tree/v1.5.0/packages/coding-agent).
+Export metadata-only OpenTelemetry from Pi coding-agent sessions and Pi Durable agents.
 
 Export model usage, timing, tool activity and lifecycle traces through OTLP/HTTP to your own collector. No replacement agent loop, tools, global OpenTelemetry registration, automatic HTTP instrumentation, transcript watcher or log scraping.
 
 ## Requirements
 
 - Node.js 22.19 or newer.
-- Tested against Pi **1.5.0**. Other Pi versions are not verified.
+- Requires Pi **1.5.0** or newer; development and CI use Pi **1.5.2** and also test the minimum version.
 - An OTLP/HTTP receiver, normally an OpenTelemetry Collector.
 
 This is an early project, distributed as [`@leocavalcante/pi-otel`](https://www.npmjs.com/package/@leocavalcante/pi-otel). See the [changelog](CHANGELOG.md) for source changes.
@@ -113,13 +113,12 @@ Service/provider/model/tool identifiers and trace metadata are still metadata. C
 ## Development
 
 ```sh
-npm ci --ignore-scripts
-npm run check
-npm test
-npm run build
-npm pack --dry-run
+bun install --frozen-lockfile
+bun run verify
 ```
 
 Tests include Pi's public adapter conformance suite, actual OTLP payload privacy checks, collector failure isolation, persistent-usage sampling, real Durable Harnesses with both native Models and SDK ModelRuntime faux-model tools, forwarding/result-identity and deferred-poll checks, and an actual coding-agent SDK extension lifecycle. They do not use paid models or production state. No process-crash recovery or arbitrary Pi-version compatibility claim is made.
+
+Development uses Bun 1.4.4 and TypeScript 6.0.3; Pi still runs the extension on Node.js. `bun run test` runs the Bun suite and a separate Node.js load test. Tests clear inherited OpenTelemetry settings before running.
 
 MIT licensed. npm publication and releases are separate from repository availability.

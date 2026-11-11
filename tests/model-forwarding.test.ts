@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { setImmediate } from 'node:timers/promises';
 import { createAssistantMessageEventStream, fauxProvider, fauxAssistantMessage, type Models } from '@earendil-works/pi-ai';
