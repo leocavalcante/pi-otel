@@ -5,6 +5,8 @@ coverage/
 *.log
 .env
 .env.*
+.npmrc
+.pi/
 !.env.example
 *.sqlite
 *.sqlite-*

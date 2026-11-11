@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'bun:test';
 import { TracerProvider, type ReadableSpan, type SpanProcessor } from '@opentelemetry/sdk-trace';
 import { trace, type Meter, type SpanContext, type Attributes } from '@opentelemetry/api';
 import { createTelemetryAdapterConformance } from '@earendil-works/pi-telemetry/testing';
