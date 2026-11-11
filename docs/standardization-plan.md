@@ -1,6 +1,14 @@
 # Standardization plan: pi-otel
 
-Status: draft, 2026-11-10. Target: [Pi extension standard v1](pi-extension-standard.md). Delete this file once every step is done.
+Status: in progress, 2026-11-11. Target: [Pi extension standard v1](pi-extension-standard.md). Delete this file once every step is done.
+
+## Progress
+
+- Step 0 is complete: identity, repository settings, CodeQL, security features, labels, the `npm` environment, and branch/tag rulesets are configured.
+- Step 1 merged in [PR #1](https://github.com/leocavalcante/pi-otel/pull/1). Linux, macOS, Windows, Node.js 22.19/22/24/26, minimum Pi 1.5.0, package checks, and security scans passed.
+- Steps 2–3 are prepared, but the publishing workflow must not merge before npm Trusted Publishing is configured for `cd.yaml` and environment `npm`.
+- pi-ttyd is archived on GitHub. Its npm deprecation still requires interactive npm login.
+- Dependabot uses a 7-day cooldown for Bun and Actions updates to satisfy zizmor.
 
 pi-otel is the pilot. It goes first because npm users are on a broken release, and because it's the smallest repository with no CI to migrate.
 
@@ -60,7 +68,7 @@ Step 3 comes before formatting and linting so the missing fix reaches npm users 
 
 - [ ] Run `npm login`, then `npm trust list @leocavalcante/pi-otel`. There may be no trusted publisher yet.
 - [ ] Run `npm trust github @leocavalcante/pi-otel --file cd.yaml --repo leocavalcante/pi-otel --env npm --allow-publish`.
-- [ ] The `npm` environment exists, with `main` as its only deployment branch.
+- [x] The `npm` environment exists, with `main` as its only deployment branch.
 - [ ] Merge step 2. Nothing is released yet, because there are no releasable commits since `v0.1.2`.
 - [ ] Merge step 3, then check:
   - [ ] Tag `v0.1.3` exists.
