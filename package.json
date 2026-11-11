@@ -52,7 +52,7 @@
     "@opentelemetry/exporter-logs-otlp-http": "0.301.0"
   },
   "peerDependencies": {
-    "@earendil-works/pi-ai": "^1.5.0",
+    "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*"
   },
   "peerDependenciesMeta": {

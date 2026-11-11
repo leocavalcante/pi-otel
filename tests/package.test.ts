@@ -19,3 +19,11 @@ test('Pi production installs include the telemetry runtime without installing pe
   assert.equal(lock.workspaces[''].devDependencies[dependency], undefined);
   assert.equal(lock.packages[dependency][0], `${dependency}@${version}`);
 });
+
+test('Pi host modules remain wildcard peers rather than bundled runtime dependencies', () => {
+  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  for (const name of ['@earendil-works/pi-ai', '@earendil-works/pi-coding-agent']) {
+    assert.equal(manifest.peerDependencies[name], '*');
+    assert.equal(manifest.dependencies[name], undefined);
+  }
+});
