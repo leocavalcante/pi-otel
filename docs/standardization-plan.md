@@ -4,11 +4,13 @@ Status: in progress, 2026-11-11. Target: [Pi extension standard v1](pi-extension
 
 ## Progress
 
-- Step 0 is complete: identity, repository settings, CodeQL, security features, labels, the `npm` environment, and branch/tag rulesets are configured.
+- Step 0 is complete: identity, repository settings, CodeQL, security features, labels, the `npm` environment, branch and tag rulesets, and full-SHA pinning are configured.
 - Step 1 merged in [PR #1](https://github.com/leocavalcante/pi-otel/pull/1). Linux, macOS, Windows, Node.js 22.19/22/24/26, minimum Pi 1.5.0, package checks, and security scans passed.
-- Steps 2–3 are prepared, but the publishing workflow must not merge before npm Trusted Publishing is configured for `cd.yaml` and environment `npm`.
-- pi-ttyd is archived on GitHub. Its npm deprecation still requires interactive npm login.
-- Dependabot uses a 7-day cooldown for Bun and Actions updates to satisfy zizmor.
+- Step 2 merged in [PR #5](https://github.com/leocavalcante/pi-otel/pull/5). The trusted publisher for `cd.yaml` and environment `npm` is configured. The first CD run exchanged an OIDC token and released nothing, as expected.
+- Step 3 merged in [PR #6](https://github.com/leocavalcante/pi-otel/pull/6) and released [0.1.3](https://github.com/leocavalcante/pi-otel/releases/tag/v0.1.3) with SLSA provenance. The package includes a `CHANGELOG.md` that Pi parses, and it ships the 0.1.2 telemetry-runtime fix that npm users never received. The v0.1.2 release notes now say it wasn't published.
+- Still to do in step 8: deprecate `0.0.0-stage` and disallow token publishing on npm (each needs a 2FA approval), plus the gallery image and social preview.
+- pi-ttyd is archived on GitHub. Its npm deprecation needs a 2FA approval.
+- Dependabot uses a 7-day cooldown for Bun and Actions updates to satisfy zizmor, and its long pull request titles are exempt from the 72-character limit.
 
 pi-otel is the pilot. It goes first because npm users are on a broken release, and because it's the smallest repository with no CI to migrate.
 
@@ -66,15 +68,15 @@ Step 3 comes before formatting and linting so the missing fix reaches npm users 
 
 ## Cutover checklist (before merging step 2)
 
-- [ ] Run `npm login`, then `npm trust list @leocavalcante/pi-otel`. There may be no trusted publisher yet.
-- [ ] Run `npm trust github @leocavalcante/pi-otel --file cd.yaml --repo leocavalcante/pi-otel --env npm --allow-publish`.
+- [x] Run `npm login`, then `npm trust list @leocavalcante/pi-otel`. There may be no trusted publisher yet.
+- [x] Run `npm trust github @leocavalcante/pi-otel --file cd.yaml --repo leocavalcante/pi-otel --env npm --allow-publish`.
 - [x] The `npm` environment exists, with `main` as its only deployment branch.
-- [ ] Merge step 2. Nothing is released yet, because there are no releasable commits since `v0.1.2`.
-- [ ] Merge step 3, then check:
-  - [ ] Tag `v0.1.3` exists.
-  - [ ] `npm view @leocavalcante/pi-otel@0.1.3 dist.attestations` shows provenance.
-  - [ ] The GitHub release has notes.
-  - [ ] The tarball contains `CHANGELOG.md`.
+- [x] Merge step 2. Nothing is released yet, because there are no releasable commits since `v0.1.2`.
+- [x] Merge step 3, then check:
+  - [x] Tag `v0.1.3` exists.
+  - [x] `npm view @leocavalcante/pi-otel@0.1.3 dist.attestations` shows provenance.
+  - [x] The GitHub release has notes.
+  - [x] The tarball contains `CHANGELOG.md`.
   - [ ] `pi update` shows "Extension Updates" in Pi.
 
 ## Notes and risks
