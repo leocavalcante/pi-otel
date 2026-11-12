@@ -1,6 +1,6 @@
 # Standardization plan: pi-otel
 
-Status: in progress, 2026-11-11. Target: [Pi extension standard v1](pi-extension-standard.md). Delete this file once every step is done.
+Status: in progress, 2026-11-12. Target: [Pi extension standard v1](pi-extension-standard.md). Delete this file once every step is done.
 
 ## Progress
 
@@ -8,8 +8,11 @@ Status: in progress, 2026-11-11. Target: [Pi extension standard v1](pi-extension
 - Step 1 merged in [PR #1](https://github.com/leocavalcante/pi-otel/pull/1). Linux, macOS, Windows, Node.js 22.19/22/24/26, minimum Pi 1.5.0, package checks, and security scans passed.
 - Step 2 merged in [PR #5](https://github.com/leocavalcante/pi-otel/pull/5). The trusted publisher for `cd.yaml` and environment `npm` is configured. The first CD run exchanged an OIDC token and released nothing, as expected.
 - Step 3 merged in [PR #6](https://github.com/leocavalcante/pi-otel/pull/6) and released [0.1.3](https://github.com/leocavalcante/pi-otel/releases/tag/v0.1.3) with SLSA provenance. The package includes a `CHANGELOG.md` that Pi parses, and it ships the 0.1.2 telemetry-runtime fix that npm users never received. The v0.1.2 release notes now say it wasn't published.
-- Still to do in step 8: deprecate `0.0.0-stage` and disallow token publishing on npm (each needs a 2FA approval), plus the gallery image and social preview.
-- pi-ttyd is archived on GitHub. Its npm deprecation needs a 2FA approval.
+- Dependabot's first updates merged. The runtime `pi-telemetry` 1.5.2 update released [0.1.4](https://github.com/leocavalcante/pi-otel/releases/tag/v0.1.4), confirming that trusted publishing works with tokens disallowed. npm took about 3 minutes to expose that version, so the post-publish check now waits up to 15 minutes ([PR #8](https://github.com/leocavalcante/pi-otel/pull/8)).
+- Steps 4–6 merged: Prettier ([PR #9](https://github.com/leocavalcante/pi-otel/pull/9)), the blame-ignore file ([PR #10](https://github.com/leocavalcante/pi-otel/pull/10)), and typescript-eslint with `noUncheckedIndexedAccess` ([PR #11](https://github.com/leocavalcante/pi-otel/pull/11)).
+- Step 7 is the README rewrite and community files, released as a patch through `docs(readme)`.
+- Step 8 is done except for gallery media. `0.0.0-stage` is deprecated, publishing requires 2FA and disallows tokens, and full-SHA pinning is required. Still to do: add `pi.image` and upload the social preview by hand.
+- pi-ttyd is archived and deprecated on npm.
 - Dependabot uses a 7-day cooldown for Bun and Actions updates to satisfy zizmor, and its long pull request titles are exempt from the 72-character limit.
 
 pi-otel is the pilot. It goes first because npm users are on a broken release, and because it's the smallest repository with no CI to migrate.
