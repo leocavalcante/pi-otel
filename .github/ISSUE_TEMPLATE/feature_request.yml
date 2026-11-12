@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest an improvement to pi-otel.
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Privacy:** don't include credentials, prompts, conversation content, or private data. Use synthetic examples.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem should this solve?
+      description: Describe what you need and why, without private content.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help?
+      description: Describe the change from a user's point of view. Synthetic examples help.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Optional. Workarounds or other approaches you've tried.

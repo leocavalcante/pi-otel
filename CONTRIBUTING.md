@@ -9,7 +9,9 @@ bun install --frozen-lockfile
 bun run verify
 ```
 
-`verify` checks source, tests, and examples; runs the Bun and Node.js test lanes; builds and validates the package in an isolated consumer; and audits dependencies. Audits block high and critical vulnerabilities. Run `bun audit` to review all severities, including moderate advisories in development tooling. Formatting and ESLint gates are separate steps in the [standardization plan](docs/standardization-plan.md).
+`verify` checks source, tests, and examples; runs the Bun and Node.js test lanes; builds and validates the package in an isolated consumer; and audits dependencies. Audits block high and critical vulnerabilities. Run `bun audit` to review all severities, including moderate advisories in development tooling.
+
+`bun run lint` runs Prettier and ESLint (typescript-eslint `strictTypeChecked`), and `bun run format` applies their fixes. Disable a rule only on the line that needs it, with a reason. Tests may relax only the unsafe-any rules, because they inspect untyped OTLP payloads.
 
 ```sh
 bun run test:bun

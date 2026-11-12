@@ -2,46 +2,70 @@
 
 Export metadata-only OpenTelemetry from Pi coding-agent sessions and Pi Durable agents.
 
-Export model usage, timing, tool activity and lifecycle traces through OTLP/HTTP to your own collector. No replacement agent loop, tools, global OpenTelemetry registration, automatic HTTP instrumentation, transcript watcher or log scraping.
+[![npm](https://img.shields.io/npm/v/@leocavalcante/pi-otel)](https://www.npmjs.com/package/@leocavalcante/pi-otel) [![CD](https://github.com/leocavalcante/pi-otel/actions/workflows/cd.yaml/badge.svg)](https://github.com/leocavalcante/pi-otel/actions/workflows/cd.yaml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/leocavalcante/pi-otel/blob/main/LICENSE)
 
-## Requirements
+pi-otel sends traces, metrics, and logs about model calls, timing, and tool activity to your own OpenTelemetry collector. Each agent run becomes a `pi.coding.run` span with `pi.coding.model` and `pi.coding.tool` children, plus token and cost counters per provider and model. pi-otel exports metadata only: it never exports prompts, answers, tool arguments, or tool results.
 
-- Node.js 22.19 or newer.
-- Requires Pi **1.5.0** or newer; development and CI use Pi **1.5.2** and also test the minimum version.
-- An OTLP/HTTP receiver, normally an OpenTelemetry Collector.
+## Contents
 
-This is an early project, distributed as [`@leocavalcante/pi-otel`](https://www.npmjs.com/package/@leocavalcante/pi-otel). See [GitHub releases](https://github.com/leocavalcante/pi-otel/releases) for release notes.
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Compatibility](#compatibility)
+- [Privacy and security](#privacy-and-security)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
-## Pi coding-agent
-
-Install the package through Pi:
+## Installation
 
 ```sh
 pi install npm:@leocavalcante/pi-otel
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
-  OTEL_SERVICE_NAME=pi-coding-agent pi
 ```
 
-To track source instead, use `pi install git:github.com/leocavalcante/pi-otel`.
-
-The extension is inert unless `OTEL_EXPORTER_OTLP_ENDPOINT` is explicitly set. It observes lifecycle events, never changes prompts or tools, and flushes on `session_shutdown`. Set `OTEL_SDK_DISABLED=true` to disable it.
-
-Coding-agent model spans measure the assistant-message lifecycle. They are named **`pi.coding.model`**, not native `pi.ai.request`, because the extension cannot observe the exact provider-request boundary. First-event timing is not guaranteed to be first visible text.
-
-## Durable and SDK applications
-
-Install the SDK with `npm install @leocavalcante/pi-otel`. To build from source:
+Then run `/reload` in Pi, or start a new session. pi-otel stays inactive until you set an OTLP endpoint, so start Pi with one:
 
 ```sh
-git clone https://github.com/leocavalcante/pi-otel.git
-cd pi-otel
-bun install --frozen-lockfile
-bun run build
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 OTEL_SERVICE_NAME=pi-coding-agent pi
 ```
 
-Another application can install that built directory with `npm install /path/to/pi-otel --ignore-scripts`.
+You need an OTLP/HTTP receiver, usually an [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/). To try pi-otel once without adding it to your settings, run `pi -e npm:@leocavalcante/pi-otel`.
 
-Pass telemetry to your **existing** Harness owner:
+To follow unreleased changes, install from GitHub instead:
+
+```sh
+pi install git:github.com/leocavalcante/pi-otel
+```
+
+Git installations track `main` and report version `0.0.0-development`, so Pi doesn't show release notes for them. Remove either installation with `pi remove` and the same source.
+
+## Usage
+
+### In Pi
+
+The extension observes lifecycle events, never changes prompts or tools, and flushes its data when the session shuts down.
+
+| Signal                                       | What it records                                                         |
+| -------------------------------------------- | ----------------------------------------------------------------------- |
+| `pi.coding.run` span                         | One agent run, from `agent_start` to `agent_settled`                    |
+| `pi.coding.model` span                       | One assistant message, from `message_start` to `message_end`            |
+| `pi.coding.tool` span                        | One tool execution, nested under its parent tool call when there is one |
+| `pi.ai.tokens`, `pi.ai.cost` counters        | Reported input, output, and cache tokens, and reported cost             |
+| `pi.coding.tool.results` counter             | Each tool result, with its outcome and whether it ran                   |
+| `pi.coding.run.duration` and more histograms | Run, model, and tool durations                                          |
+| Completion logs                              | One fixed-text log per finished span, correlated with its trace         |
+
+Model spans cover the assistant-message lifecycle, not the provider request, which the extension can't observe. That's why they're named `pi.coding.model` rather than `pi.ai.request`. Their first event isn't necessarily the first visible text.
+
+See [signal semantics](https://github.com/leocavalcante/pi-otel/blob/main/docs/metrics.md) for every signal, unit, and how to interpret it.
+
+### In Pi Durable and SDK applications
+
+```sh
+npm install @leocavalcante/pi-otel
+```
+
+Pass pi-otel's telemetry to your existing Harness owner:
 
 ```ts
 import { createPiOtel } from "@leocavalcante/pi-otel";
@@ -52,84 +76,93 @@ const otel = createPiOtel({
 });
 const harness = await Harness.open(
   storage,
-  {
-    models,
-    registry,
-    telemetry: otel.telemetry,
-  },
+  { models, registry, telemetry: otel.telemetry },
   context,
 );
 
-// Optional: sample durable totals through this owner. Does not open another Harness.
+// Optional: sample persisted usage totals through this owner.
 await otel.observeDurable(harness, context);
 
-// Existing application startup, submission and server lifecycle stay unchanged.
-// During shutdown, stop accepting requests before closing the owner:
+// During shutdown, stop accepting requests, then close the owner before pi-otel.
 await harness.close(context);
 await otel.shutdown();
 ```
 
-See a complete [model-free Durable example](examples/durable.ts). For coding-agent SDK sessions, call `otel.observeCodingAgent(session)` instead of installing the extension. Do not enable both for the same session. The returned function unsubscribes. Neither path observes work that happened before attachment.
+See the [model-free Durable example](https://github.com/leocavalcante/pi-otel/blob/main/examples/durable.ts). For coding-agent SDK sessions, call `otel.observeCodingAgent(session)` instead of installing the extension, never both for the same session. The function it returns unsubscribes. Neither path sees work that happened before you attached it.
 
-### SDK ModelRuntime 1.5.0 compatibility
+`createPiOtel()` returns:
 
-That SDK runtime dispatches directly to providers instead of Pi AI's instrumented `Models` request path. Passing only `HarnessOptions.telemetry` therefore records Durable phases but misses AI request latency/tokens. If your Durable application uses **ModelRuntime 1.5.0**, pass `models: otel.modelRuntime(runtime)` to the same existing Harness. Wrap once. Do **not** wrap `createModels()`, which already emits native AI telemetry, or an unverified newer runtime.
+| Member                             | Purpose                                                                    |
+| ---------------------------------- | -------------------------------------------------------------------------- |
+| `telemetry`                        | The telemetry context to pass to a Harness                                 |
+| `modelRuntime(runtime)`            | Wraps an SDK ModelRuntime 1.5.0 so its requests are measured (see below)   |
+| `observeDurable(harness, context)` | Samples `harness.usage(context)` every 15 seconds; returns a stop function |
+| `observeCodingAgent(session)`      | Observes a coding-agent SDK session; returns an unsubscribe function       |
+| `codingObserver()`                 | The metadata-only event observer that the extension uses                   |
+| `forceFlush()`, `shutdown()`       | Resolve to `false` when export was incomplete, instead of throwing         |
 
-The compatibility facade uses Pi's public `lazyStream` observer and `AI_TELEMETRY_SCHEMA`. Catalog/auth/configuration methods stay bound to the original runtime. Model/context/options (including signal and auth overrides) are forwarded unchanged, one underlying call per request. Events and result objects are not replaced; no request retries or credential handling are added. Deferred pending polls record timing but not token/cost consumption.
+Your application keeps owning its providers and lifecycle: pi-otel installs no global OpenTelemetry provider or context manager. Configuration errors fail immediately, with messages that contain no sensitive input.
 
-The returned object exposes `telemetry`, `modelRuntime`, `observeDurable`, `observeCodingAgent`, `codingObserver`, `forceFlush()` and `shutdown()`. Flush/shutdown resolve to `false` on incomplete export rather than throwing backend failures into agent work. Configuration errors fail immediately with non-sensitive messages. Providers and lifecycle remain owned by the caller; no global API provider or ambient context manager is installed.
+**SDK ModelRuntime 1.5.0.** That runtime sends requests straight to providers, bypassing the instrumented `Models` path. With only `telemetry` passed, Durable phases are recorded but AI request latency and tokens are not. Pass `models: otel.modelRuntime(runtime)` to the same Harness, and wrap it once. Don't wrap `createModels()`, which already emits AI telemetry, or a newer runtime you haven't verified. The wrapper forwards every call unchanged, makes exactly one underlying call per request, and adds no retries or credential handling. Pending deferred polls record timing but not token or cost usage.
+
+**Usage isn't billing.** Pi's persisted `pi.usage` stays the authoritative record for Durable accounting. Pi-reported cost in USD isn't an invoice, and zero can mean an unpriced or subscription model. Task admission isn't answer latency, and a successful tool phase doesn't mean the tool's external effect succeeded.
+
+### Collector and dashboard examples
+
+- [`examples/collector.yaml`](https://github.com/leocavalcante/pi-otel/blob/main/examples/collector.yaml) prints a summary of the signals it receives.
+- [`examples/grafana/pi-agents.json`](https://github.com/leocavalcante/pi-otel/blob/main/examples/grafana/pi-agents.json) is a Grafana dashboard that expects a Prometheus data source with standard OTLP metric-name translation.
+
+Neither example installs a backend or opens a public listener.
 
 ## Configuration
 
-OTLP uses JSON over HTTP(S). Each signal has its own exporter. Standard SDK environment variables include:
+pi-otel sends OTLP as JSON over HTTP or HTTPS, with one exporter per signal. It reads the standard OpenTelemetry environment variables:
 
-| Variable                                            | Purpose                                                                 |
-| --------------------------------------------------- | ----------------------------------------------------------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`                       | Base URL; `/v1/traces`, `/v1/metrics`, `/v1/logs` are appended          |
-| `OTEL_EXPORTER_OTLP_{TRACES,METRICS,LOGS}_ENDPOINT` | Complete per-signal URL; overrides the base                             |
-| `OTEL_EXPORTER_OTLP_HEADERS`                        | Authentication headers, handled by upstream exporters; never attributes |
-| `OTEL_EXPORTER_OTLP_{TRACES,METRICS,LOGS}_HEADERS`  | Per-signal header override                                              |
-| `OTEL_SERVICE_NAME`                                 | Non-sensitive service identifier                                        |
-| `OTEL_RESOURCE_ATTRIBUTES`                          | Only `service.namespace` and `service.version` are retained             |
-| `OTEL_METRIC_EXPORT_INTERVAL`                       | Milliseconds; default 15000, minimum 1000                               |
-| `OTEL_SDK_DISABLED`                                 | `true` disables export                                                  |
+| Variable                                            | Description                                                                            |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                       | Base URL. pi-otel appends `/v1/traces`, `/v1/metrics`, and `/v1/logs`. Required in Pi. |
+| `OTEL_EXPORTER_OTLP_{TRACES,METRICS,LOGS}_ENDPOINT` | Full URL for one signal. Overrides the base URL.                                       |
+| `OTEL_EXPORTER_OTLP_HEADERS`                        | Authentication headers. They stay transport configuration, never attributes.           |
+| `OTEL_EXPORTER_OTLP_{TRACES,METRICS,LOGS}_HEADERS`  | Headers for one signal.                                                                |
+| `OTEL_SERVICE_NAME`                                 | Service name. Defaults to `pi-coding-agent` in Pi and `pi-agent` in the SDK.           |
+| `OTEL_RESOURCE_ATTRIBUTES`                          | Only `service.namespace` and `service.version` are kept.                               |
+| `OTEL_METRIC_EXPORT_INTERVAL`                       | Metric export interval in milliseconds. Default 15000; minimum 1000.                   |
+| `OTEL_SDK_DISABLED`                                 | Set to `true` to turn pi-otel off.                                                     |
 
-Factory `endpoint`, `serviceName`, `serviceNamespace` and `serviceVersion` options override their base environment defaults. Per-signal endpoint variables still take precedence. Embedded URL credentials, query parameters and fragments are rejected. For remote receivers use normally verified HTTPS; never disable certificate verification.
+In the SDK, the `endpoint`, `serviceName`, `serviceNamespace`, and `serviceVersion` options override the base environment variables; per-signal endpoints still win.
 
-Batch queues are bounded to 512 spans/logs. Exports have a five-second deadline. Telemetry can be lost during crashes, queue pressure, network failures or shutdown. Export errors appear in `pi.otel.export.errors` if metrics subsequently reach the receiver; they are not printed with backend/auth details.
+- **Endpoints.** URLs with embedded credentials, query strings, or fragments are rejected. Use HTTPS with normal certificate verification for remote receivers.
+- **Limits.** Batch queues hold up to 512 spans and 512 logs, and each export has a 5-second deadline. Crashes, queue pressure, network failures, and shutdown can lose telemetry.
+- **Export errors.** Failed exports are counted in `pi.otel.export.errors`, which you see once metrics reach the receiver again. pi-otel never prints backend or authentication details.
 
-## What you get
+## Compatibility
 
-- Durable's native `pi.ai.*` and `pi.durable.*` spans, events and metric names/units.
-- Coding-agent run/model/tool spans, reported token/cost counters and tool-result metadata.
-- Heartbeat, Node RSS, Durable tool-phase attempts, phase timing and resumed-phase counts.
-- Optional persistent usage gauges from `harness.usage(context)`, separate from live counters. Restarts do not replay old totals as new token consumption.
-- Fixed-body completion logs correlated with trace IDs.
-- Explicit W3C `traceparent` / `tracestate` propagation, including links. No baggage by default, and no automatic transport or A2A propagation.
+Requires Pi 1.5.0 or newer and Node.js 22.19 or newer. Tested with Pi 1.5.2 on Linux, macOS, and Windows; CI also tests Pi 1.5.0 and checks the latest Pi release every week.
 
-See [metric semantics](docs/metrics.md), [privacy boundaries](docs/privacy.md) and [design references](docs/research.md). A [collector example](examples/collector.yaml) prints basic signal summaries; a [Grafana dashboard](examples/grafana/pi-agents.json) expects a Prometheus data source with standard OTLP metric-name translation. Neither installs a backend or opens a public listener.
+- Trace context propagates through explicit W3C `traceparent` and `tracestate` values, including links. pi-otel adds no baggage and doesn't propagate context over transports such as HTTP or A2A on its own.
+- Durable tool phases report phase outcomes, not tool-result success.
+- Recovery after a process crash isn't covered by tests.
 
-**Usage is not billing.** Pi's persisted `pi.usage` remains authoritative for Durable accounting. Pi-reported USD is not an invoice; zero may mean an unpriced or subscription model. Task admission is not answer latency; successful tool phases do not imply successful external effects.
+## Privacy and security
 
-## Privacy
+pi-otel exports metadata only. It never exports prompts, answers, reasoning, attachments, tool arguments or results, file contents, credentials, headers, exception messages or stack traces, or free-form error text. There's no switch to capture content.
 
-Prompts, answers, reasoning, attachments, tool arguments/results, filesystem contents, credentials, headers, exception messages/stacks and free-form error descriptions are not exported. Export uses fixed schema allowlists; unknown span names are replaced and unknown attributes/events/metrics are dropped. There is no content-capture switch.
+- **Allowlists.** Every span, event, and metric field is checked against a fixed allowlist when exported. Unknown span names become `pi.operation`, and unknown attributes, events, and metrics are dropped.
+- **Remaining metadata.** Service, provider, model, and tool names, operational IDs, and usage and timing numbers are still exported, and they can reveal activity. Choose names that aren't sensitive, control who can read your collector, and set its retention.
+- **Scope.** This policy covers what pi-otel sends. It doesn't scan for secrets or sanitize other applications that send to your collector.
 
-Service/provider/model/tool identifiers and trace metadata are still metadata. Choose non-sensitive names. This policy is not a general secret scanner or a sanitizer for other applications sending to your collector. Public examples and tests use synthetic data only.
+Tests inject synthetic private markers into prompts, model output, tool arguments and results, and errors, then inspect the actual HTTP bodies. See the full [privacy boundary](https://github.com/leocavalcante/pi-otel/blob/main/docs/privacy.md). To report a vulnerability, see [SECURITY.md](https://github.com/leocavalcante/pi-otel/blob/main/SECURITY.md).
 
-## Development
+## Troubleshooting
 
-```sh
-bun install --frozen-lockfile
-bun run verify
-```
+- **Nothing reaches the collector.** Pi must start with `OTEL_EXPORTER_OTLP_ENDPOINT` already set, and `OTEL_SDK_DISABLED` must not be `true`. Run `/reload` after changing either, and check that the receiver accepts OTLP over HTTP.
+- **Metrics appear but traces or logs don't.** Check the per-signal endpoint variables: a per-signal URL replaces the base URL and its `/v1/...` suffix.
+- **Some exports were lost.** Watch the `pi.otel.export.errors` counter, which is labeled by signal.
 
-Tests include Pi's public adapter conformance suite, actual OTLP payload privacy checks, collector failure isolation, persistent-usage sampling, real Durable Harnesses with both native Models and SDK ModelRuntime faux-model tools, forwarding/result-identity and deferred-poll checks, and an actual coding-agent SDK extension lifecycle. They do not use paid models or production state. No process-crash recovery or arbitrary Pi-version compatibility claim is made.
+## Contributing
 
-Development uses Bun 1.4.4 and TypeScript 6.0.3; Pi still runs the extension on Node.js. `bun run test` runs the Bun suite and a separate Node.js load test. Tests clear inherited OpenTelemetry settings before running.
+See [CONTRIBUTING.md](https://github.com/leocavalcante/pi-otel/blob/main/CONTRIBUTING.md) for development setup, checks, and how releases work. Design notes are in [research.md](https://github.com/leocavalcante/pi-otel/blob/main/docs/research.md).
 
-Merging a releasable Conventional Commit to `main` runs `.github/workflows/cd.yaml`, which publishes to npm with provenance and creates a GitHub release. The version on `main` is `0.0.0-development`; release versions live in tags and npm. GitHub installations track development source and do not receive Pi's package update notes.
+## License
 
-For release setup and recovery, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-MIT licensed.
+MIT. See [LICENSE](https://github.com/leocavalcante/pi-otel/blob/main/LICENSE).
