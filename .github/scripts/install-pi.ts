@@ -8,6 +8,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+interface PackageManifest {
+  dependencies: Record<string, string>;
+  devDependencies: Record<string, string>;
+}
+
 const requested = process.argv[2];
 if (!requested || !/^(?:latest|\d+\.\d+\.\d+)$/.test(requested)) {
   throw new Error("Expected a stable Pi version or latest.");
@@ -21,14 +26,17 @@ if (requested === "latest") {
       signal: AbortSignal.timeout(15000),
     },
   );
-  if (!response.ok) throw new Error(`Registry returned ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Registry returned ${String(response.status)}`);
   const metadata = (await response.json()) as { version: string };
   version = metadata.version;
   if (!/^\d+\.\d+\.\d+$/.test(version))
     throw new Error("Expected a stable Pi version.");
 }
 
-const manifest = JSON.parse(readFileSync("package.json", "utf8"));
+const manifest = JSON.parse(
+  readFileSync("package.json", "utf8"),
+) as PackageManifest;
 for (const [name] of Object.entries(manifest.devDependencies)) {
   if (name.startsWith("@earendil-works/"))
     manifest.devDependencies[name] = version;

@@ -6,7 +6,7 @@ for (const name of [
   "OTEL_SDK_DISABLED",
   "OTEL_METRIC_EXPORT_INTERVAL",
 ])
-  delete process.env[name];
+  Reflect.deleteProperty(process.env, name);
 for (const signal of ["", "_TRACES", "_METRICS", "_LOGS"]) {
   for (const option of [
     "ENDPOINT",
@@ -17,6 +17,9 @@ for (const signal of ["", "_TRACES", "_METRICS", "_LOGS"]) {
     "COMPRESSION",
     "PROTOCOL",
   ]) {
-    delete process.env[`OTEL_EXPORTER_OTLP${signal}_${option}`];
+    Reflect.deleteProperty(
+      process.env,
+      `OTEL_EXPORTER_OTLP${signal}_${option}`,
+    );
   }
 }

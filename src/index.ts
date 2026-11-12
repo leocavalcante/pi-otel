@@ -17,7 +17,9 @@ import { resourceFromAttributes } from "@opentelemetry/resources";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import { ExportResultCode } from "@opentelemetry/core";
 import type { ExportResult } from "@opentelemetry/core";
+import { SeverityNumber } from "@opentelemetry/api";
 import type { TelemetryContext } from "@earendil-works/pi-telemetry";
 import type { Models } from "@earendil-works/pi-ai";
 import { withModelRuntimeTelemetry } from "./model-runtime.ts";
@@ -136,12 +138,14 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
       "OTEL_METRIC_EXPORT_INTERVAL must be at least 1000 milliseconds.",
     );
   let exportFailures = 0;
-  let exporterError: ((signal: string) => void) | undefined;
+  const exporterError: { report: (signal: string) => void } = {
+    report: () => undefined,
+  };
   const checked =
     (signal: string, callback: (result: ExportResult) => void) =>
     (result: ExportResult) => {
-      if (result.code !== 0) {
-        exporterError?.(signal);
+      if (result.code !== ExportResultCode.SUCCESS) {
+        exporterError.report(signal);
         // Prevent SDK diagnostics from exposing raw backend/authentication error text.
         callback({
           code: result.code,
@@ -160,8 +164,9 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
       : [
           new PeriodicExportingMetricReader({
             exporter: {
-              export: (data, callback) =>
-                metricExporter.export(data, checked("metrics", callback)),
+              export: (data, callback) => {
+                metricExporter.export(data, checked("metrics", callback));
+              },
               forceFlush: () => metricExporter.forceFlush(),
               shutdown: () => metricExporter.shutdown(),
               selectAggregationTemporality: (kind) =>
@@ -174,7 +179,7 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
   });
   const meter = meters.getMeter("@leocavalcante/pi-otel", "0.1.2");
   const exportErrors = meter.createCounter("pi.otel.export.errors");
-  exporterError = (signal) => {
+  exporterError.report = (signal) => {
     exportFailures++;
     exportErrors.add(1, { signal });
   };
@@ -183,8 +188,9 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
     timeoutMillis: 5000,
   });
   const safeExporter: SpanExporter = {
-    export: (spans, callback) =>
-      traceExporter.export(spans.map(safeSpan), checked("traces", callback)),
+    export: (spans, callback) => {
+      traceExporter.export(spans.map(safeSpan), checked("traces", callback));
+    },
     shutdown: () => traceExporter.shutdown(),
     forceFlush: () => traceExporter.forceFlush(),
   };
@@ -214,8 +220,9 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
       : [
           new BatchLogRecordProcessor({
             exporter: {
-              export: (records, callback) =>
-                logExporter.export(records, checked("logs", callback)),
+              export: (records, callback) => {
+                logExporter.export(records, checked("logs", callback));
+              },
               shutdown: () => logExporter.shutdown(),
               forceFlush: () => logExporter.forceFlush(),
             },
@@ -246,7 +253,7 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
       if (safe)
         logger.emit({
           body: name,
-          severityNumber: 9,
+          severityNumber: SeverityNumber.INFO,
           attributes: safe,
           context,
         });
@@ -260,7 +267,10 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
       }
       logger.emit({
         body: name + ".completed",
-        severityNumber: status.status === "error" ? 17 : 9,
+        severityNumber:
+          status.status === "error"
+            ? SeverityNumber.ERROR
+            : SeverityNumber.INFO,
         attributes: safe,
         context,
       });
@@ -287,17 +297,21 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
   });
   meter
     .createObservableGauge("pi.otel.heartbeat", { unit: "s" })
-    .addCallback((result) => result.observe(Date.now() / 1000));
+    .addCallback((result) => {
+      result.observe(Date.now() / 1000);
+    });
   meter
     .createObservableGauge("pi.otel.process.memory.rss", { unit: "By" })
-    .addCallback((result) => result.observe(process.memoryUsage().rss));
+    .addCallback((result) => {
+      result.observe(process.memoryUsage().rss);
+    });
   const usageTokens = meter.createObservableGauge("pi.otel.usage.tokens", {
     unit: "token",
   });
   const usageCost = meter.createObservableGauge("pi.otel.usage.cost", {
     unit: "USD",
   });
-  type Row = {
+  interface Row {
     provider: string;
     model: string;
     input: number;
@@ -305,7 +319,7 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
     cacheRead: number;
     cacheWrite: number;
     cost: number;
-  };
+  }
   const snapshots = new Map<object, Row[]>();
   usageTokens.addCallback((result) => {
     for (const rows of snapshots.values())
@@ -332,7 +346,7 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
   });
   void telemetry.startSpan(
     { name: "pi.otel.lifecycle", attributes: { event: "started" } },
-    () => {},
+    () => undefined,
   );
   const usageErrors = meter.createCounter("pi.otel.usage.read.errors");
   const cleanup = new Set<() => void>();
@@ -341,13 +355,15 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
     telemetry,
     modelRuntime: (runtime) => withModelRuntimeTelemetry(runtime, telemetry),
     async observeDurable(harness, context) {
-      if (disabled || closing) return () => {};
-      let stopped = false;
-      let reading = false;
+      if (disabled || closing) return () => undefined;
+      // Kept outside narrowable locals: stop() can run while a read awaits, and the
+      // read must then neither publish a snapshot nor start another one.
+      const state = { reading: false };
+      const stopped = new WeakSet<object>();
       const key = {};
       const update = async () => {
-        if (stopped || reading) return;
-        reading = true;
+        if (stopped.has(key) || state.reading) return;
+        state.reading = true;
         try {
           const usage = await harness.usage(context);
           const rows: Row[] = [];
@@ -378,11 +394,11 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
               cost: value.cost.total,
             });
           }
-          if (!stopped) snapshots.set(key, rows);
+          if (!stopped.has(key)) snapshots.set(key, rows);
         } catch {
           usageErrors.add(1);
         } finally {
-          reading = false;
+          state.reading = false;
         }
       };
       await update();
@@ -391,7 +407,7 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
       }, 15000);
       timer.unref();
       const stop = () => {
-        stopped = true;
+        stopped.add(key);
         clearInterval(timer);
         snapshots.delete(key);
         cleanup.delete(stop);
@@ -402,7 +418,9 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
     codingObserver: () => codingObserver(telemetry, meter),
     observeCodingAgent(source) {
       const observer = api.codingObserver();
-      const unsubscribe = source.subscribe((event) => observer.handle(event));
+      const unsubscribe = source.subscribe((event) => {
+        observer.handle(event);
+      });
       const stop = () => {
         unsubscribe();
         observer.close();
@@ -429,7 +447,7 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
       closing = (async () => {
         await telemetry.startSpan(
           { name: "pi.otel.lifecycle", attributes: { event: "stopped" } },
-          () => {},
+          () => undefined,
         );
         const flushed = await api.forceFlush();
         const results = await Promise.allSettled([

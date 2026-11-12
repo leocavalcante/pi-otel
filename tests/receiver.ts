@@ -8,21 +8,23 @@ export async function receiver(status = 200) {
     body: any;
     headers: Record<string, unknown>;
   }[] = [];
-  const server = createServer(async (request, response) => {
-    const chunks: Buffer[] = [];
-    for await (const chunk of request) chunks.push(Buffer.from(chunk));
-    let bytes = Buffer.concat(chunks);
-    if (request.headers["content-encoding"] === "gzip")
-      bytes = gunzipSync(bytes);
-    requests.push({
-      path: request.url!,
-      body: JSON.parse(bytes.toString()),
-      headers: { ...request.headers },
-    });
-    response.writeHead(status, { "content-type": "application/json" });
-    response.end(
-      status === 200 ? "{}" : '{"message":"Synthetic backend unavailable"}',
-    );
+  const server = createServer((request, response) => {
+    void (async () => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      let bytes = Buffer.concat(chunks);
+      if (request.headers["content-encoding"] === "gzip")
+        bytes = gunzipSync(bytes);
+      requests.push({
+        path: request.url!,
+        body: JSON.parse(bytes.toString()),
+        headers: { ...request.headers },
+      });
+      response.writeHead(status, { "content-type": "application/json" });
+      response.end(
+        status === 200 ? "{}" : '{"message":"Synthetic backend unavailable"}',
+      );
+    })();
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -31,10 +33,14 @@ export async function receiver(status = 200) {
     throw new Error("Fixture listener unavailable");
   return {
     requests,
-    endpoint: `http://127.0.0.1:${address.port}`,
+    endpoint: `http://127.0.0.1:${String(address.port)}`,
     async close() {
       server.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => {
+        server.close(() => {
+          resolve();
+        });
+      });
     },
   };
 }

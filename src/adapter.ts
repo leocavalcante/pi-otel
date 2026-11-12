@@ -23,17 +23,18 @@ import type {
   SpanLink,
   HistogramOptions,
   InstrumentOptions,
+  AttributeValue,
 } from "@earendil-works/pi-telemetry";
 
-export type Completion = {
+export interface Completion {
   name: string;
   attributes: SpanAttributes;
   status: SpanStatus;
   duration: number;
   context: Context;
   native: NativeSpan;
-};
-export type AdapterOptions = {
+}
+export interface AdapterOptions {
   tracer: Tracer;
   meter: Meter;
   onEnd?: (value: Completion) => void;
@@ -46,13 +47,23 @@ export type AdapterOptions = {
     name: string,
     attributes: SpanAttributes,
   ) => SpanAttributes | undefined;
-};
+}
+function isAttributeArray(
+  value: AttributeValue,
+): value is readonly string[] | readonly number[] | readonly boolean[] {
+  return Array.isArray(value);
+}
 const copy = (attributes: SpanAttributes = {}): Attributes =>
   Object.fromEntries(
     Object.entries(attributes)
-      .filter(([, value]) => value !== undefined)
-      .map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
-  ) as Attributes;
+      .filter(
+        (entry): entry is [string, AttributeValue] => entry[1] !== undefined,
+      )
+      .map(([key, value]) => [
+        key,
+        isAttributeArray(value) ? [...value] : value,
+      ]),
+  );
 const quiet = (work: () => void) => {
   try {
     work();
@@ -89,9 +100,9 @@ export class OtelAdapter implements TelemetryContext {
       inject: (context: TelemetryContext): TelemetryCarrier | undefined => {
         const native = this.contexts.get(context);
         const id = native && trace.getSpanContext(native);
-        if (!id || !isSpanContextValid(id)) return undefined;
+        if (!native || !id || !isSpanContextValid(id)) return undefined;
         const carrier: TelemetryCarrier = {};
-        this.codec.inject(native!, carrier, defaultTextMapSetter);
+        this.codec.inject(native, carrier, defaultTextMapSetter);
         return carrier;
       },
       extract: (carrier: TelemetryCarrier | undefined): TelemetryContext => {
@@ -147,7 +158,7 @@ export class OtelAdapter implements TelemetryContext {
           value: number,
           values?: SpanAttributes,
           context?: TelemetryContext,
-        ) =>
+        ): void => {
           quiet(() => {
             const filtered = attributes(name, values);
             if (filtered === undefined) return;
@@ -161,9 +172,10 @@ export class OtelAdapter implements TelemetryContext {
               );
             else native.add(value, copy(filtered));
           });
+        };
         return kind === "histogram" ? { record } : { add: record };
       } catch {
-        return { add: () => {}, record: () => {} };
+        return { add: () => undefined, record: () => undefined };
       }
     };
     this.metrics = {
@@ -201,15 +213,17 @@ export class OtelAdapter implements TelemetryContext {
       metrics: this.metrics,
       propagation: this.propagation,
       startSpan: (_options, work) => this.inert(work),
-      setAttributes() {},
-      setStatus() {},
-      addEvent() {},
-      addLink() {},
+      setAttributes: () => undefined,
+      setStatus: () => undefined,
+      addEvent: () => undefined,
+      addLink: () => undefined,
     };
     this.contexts.set(span, ROOT_CONTEXT);
     try {
       return Promise.resolve(callback(span));
     } catch (error) {
+      // Preserve the callback's rejection value, including non-Error reasons.
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- Preserve the caller's original rejection value and identity.
       return Promise.reject(error);
     }
   }
@@ -311,7 +325,9 @@ export class OtelAdapter implements TelemetryContext {
           native,
         }),
       );
-      quiet(() => native.end());
+      quiet(() => {
+        native.end();
+      });
     };
     // Invoke immediately and exactly once. Never retry a callback after recording fails.
     let returned: T | Promise<T>;
@@ -319,6 +335,7 @@ export class OtelAdapter implements TelemetryContext {
       returned = callback(span);
     } catch (error) {
       end(true, error);
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- Preserve the caller's original rejection value and identity.
       return Promise.reject(error);
     }
     return Promise.resolve(returned).then(
@@ -326,7 +343,7 @@ export class OtelAdapter implements TelemetryContext {
         end(false);
         return value;
       },
-      (error) => {
+      (error: unknown) => {
         end(true, error);
         throw error;
       },

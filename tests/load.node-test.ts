@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import extension from "../src/extension.ts";
 
-test("the extension loads on Node.js and registers observation-only hooks", async () => {
+void test("the extension loads on Node.js and registers observation-only hooks", async () => {
   const handlers = new Map<string, (event: unknown) => unknown>();
   const pi = {
     on(name: string, handler: (event: unknown) => unknown) {

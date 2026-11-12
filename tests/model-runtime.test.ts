@@ -51,8 +51,10 @@ test("SDK ModelRuntime preserves its auth/forwarding path and exports each model
             type: "object",
             properties: { text: { type: "string" } },
           },
-          async execute() {
-            return { output: [{ type: "text", text: PRIVATE }] };
+          execute() {
+            return Promise.resolve({
+              output: [{ type: "text", text: PRIVATE }],
+            });
           },
         }),
       ],

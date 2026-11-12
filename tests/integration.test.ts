@@ -54,9 +54,11 @@ test("real Durable Harness, faux model and harmless tool export native spans and
             type: "object",
             properties: { text: { type: "string" } },
           },
-          async execute() {
+          execute() {
             calls++;
-            return { output: [{ type: "text", text: PRIVATE }] };
+            return Promise.resolve({
+              output: [{ type: "text", text: PRIVATE }],
+            });
           },
         }),
       ],
@@ -177,10 +179,13 @@ test("actual coding-agent SDK and real extension lifecycle observe a faux tool e
           parameters: {
             type: "object",
             properties: { text: { type: "string" } },
-          } as any,
-          async execute() {
+          },
+          execute() {
             toolCalls++;
-            return { content: [{ type: "text", text: PRIVATE }], details: {} };
+            return Promise.resolve({
+              content: [{ type: "text", text: PRIVATE }],
+              details: {},
+            });
           },
         },
       ],

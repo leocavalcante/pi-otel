@@ -93,11 +93,12 @@ export function pick(
   attributes: Record<string, unknown> = {},
   allowed: readonly string[],
 ): Metadata {
-  return Object.fromEntries(
-    allowed.flatMap((key) =>
-      valueSafe(attributes[key]) ? [[key, attributes[key]]] : [],
-    ),
-  ) as Metadata;
+  return Object.fromEntries<string | number | boolean>(
+    allowed.flatMap((key) => {
+      const value = attributes[key];
+      return valueSafe(value) ? [[key, value]] : [];
+    }),
+  );
 }
 export function metricAttributes(
   name: string,
@@ -112,14 +113,15 @@ export function eventAttributes(
   return EVENTS[name] ? pick(attributes, EVENTS[name]) : undefined;
 }
 export function errorCategory(name?: string): string {
+  const category = name ?? "";
   return [
     "provider_error",
     "task_faulted",
     "task_failed",
     "task_orphaned",
     "tool_error",
-  ].includes(name ?? "")
-    ? name!
+  ].includes(category)
+    ? category
     : "operation_error";
 }
 export function safeSpan(span: ReadableSpan): ReadableSpan {
