@@ -595,12 +595,12 @@ jobs:
       }
     ],
     "@semantic-release/npm",
-    "@semantic-release/github"
+    ["@semantic-release/github", { "labels": ["release"] }]
   ]
 }
 ```
 
-Remove the `breaking` rule when the extension reaches 1.0. The devDependencies are `semantic-release`, `@semantic-release/commit-analyzer`, `@semantic-release/exec`, `@semantic-release/npm`, `@semantic-release/github`, `conventional-changelog-conventionalcommits`, and `git-cliff`, all with exact versions. `@semantic-release/npm` installs an npm CLI that supports trusted publishing; the release job runs it with lifecycle scripts disabled and builds explicitly beforehand.
+Remove the `breaking` rule when the extension reaches 1.0. When a release fails, the GitHub plugin opens an issue labeled `release`; with its default label, `semantic-release`, which doesn't exist, GitHub rejects that issue. The devDependencies are `semantic-release`, `@semantic-release/commit-analyzer`, `@semantic-release/exec`, `@semantic-release/npm`, `@semantic-release/github`, `conventional-changelog-conventionalcommits`, and `git-cliff`, all with exact versions. `@semantic-release/npm` installs an npm CLI that supports trusted publishing; the release job runs it with lifecycle scripts disabled and builds explicitly beforehand.
 
 `.github/scripts/verify-published.mjs` polls the registry for up to 15 minutes after publishing and fails the release if the version or its SLSA provenance doesn't appear. npm processes new versions before exposing them; pi-otel 0.1.4 took three minutes. pi-otel has the reference copy.
 
