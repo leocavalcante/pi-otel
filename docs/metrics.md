@@ -2,27 +2,27 @@
 
 Native Pi units and names are preserved. Prometheus commonly translates dots to underscores and appends unit/type suffixes. Verify translation against your own receiver before copying queries.
 
-| Signal | Kind/unit | Interpretation |
-|---|---|---|
-| `pi.ai.tokens` | counter, token | Live reported input/output/cache_read/cache_write |
-| `pi.ai.cost` | counter, USD | Live Pi-reported cost, not invoiced spend |
-| `pi.ai.request.duration` | histogram, ms | Durable native logical request, including provider/auth setup |
-| `pi.ai.first_chunk.duration` | histogram, ms | First normalized event, not necessarily visible text |
-| `pi.durable.phase.duration` | histogram, ms | Handler and decision commit, excluding durable waits/downtime |
-| `pi.durable.tasks.active` | up/down counter | Native live task count |
-| `pi.durable.reports` | counter | Native fixed report categories |
-| `pi.otel.heartbeat` | gauge, s | Collection timestamp, not an independent health probe |
-| `pi.otel.process.memory.rss` | gauge, By | Node process only, excluding browser/tool children |
-| `pi.otel.tool.attempts` | counter | Durable run-mode call/execute phase invocations; coding terminal tool events |
-| `pi.otel.tool.duration` | histogram, ms | Durable phase duration; coding actual execution duration when supplied |
-| `pi.otel.recovered.phases` | counter | Native `resumed:true` invocations, not crash count |
-| `pi.otel.export.errors` | counter | Fixed signal label: traces/metrics/logs |
-| `pi.otel.usage.tokens` | gauge, token | Persisted model totals sampled through the existing Harness owner |
-| `pi.otel.usage.cost` | gauge, USD | Persisted model cost sampled through that owner |
-| `pi.coding.active` | gauge | Observer currently has a live run |
-| `pi.coding.run.duration` | histogram, ms | Observed agent_start to agent_settled |
-| `pi.coding.model.duration` | histogram, ms | Assistant-message lifecycle, not native provider request duration |
-| `pi.coding.tool.results` | counter | Tool terminal result; outcome and executed metadata |
+| Signal                       | Kind/unit       | Interpretation                                                               |
+| ---------------------------- | --------------- | ---------------------------------------------------------------------------- |
+| `pi.ai.tokens`               | counter, token  | Live reported input/output/cache_read/cache_write                            |
+| `pi.ai.cost`                 | counter, USD    | Live Pi-reported cost, not invoiced spend                                    |
+| `pi.ai.request.duration`     | histogram, ms   | Durable native logical request, including provider/auth setup                |
+| `pi.ai.first_chunk.duration` | histogram, ms   | First normalized event, not necessarily visible text                         |
+| `pi.durable.phase.duration`  | histogram, ms   | Handler and decision commit, excluding durable waits/downtime                |
+| `pi.durable.tasks.active`    | up/down counter | Native live task count                                                       |
+| `pi.durable.reports`         | counter         | Native fixed report categories                                               |
+| `pi.otel.heartbeat`          | gauge, s        | Collection timestamp, not an independent health probe                        |
+| `pi.otel.process.memory.rss` | gauge, By       | Node process only, excluding browser/tool children                           |
+| `pi.otel.tool.attempts`      | counter         | Durable run-mode call/execute phase invocations; coding terminal tool events |
+| `pi.otel.tool.duration`      | histogram, ms   | Durable phase duration; coding actual execution duration when supplied       |
+| `pi.otel.recovered.phases`   | counter         | Native `resumed:true` invocations, not crash count                           |
+| `pi.otel.export.errors`      | counter         | Fixed signal label: traces/metrics/logs                                      |
+| `pi.otel.usage.tokens`       | gauge, token    | Persisted model totals sampled through the existing Harness owner            |
+| `pi.otel.usage.cost`         | gauge, USD      | Persisted model cost sampled through that owner                              |
+| `pi.coding.active`           | gauge           | Observer currently has a live run                                            |
+| `pi.coding.run.duration`     | histogram, ms   | Observed agent_start to agent_settled                                        |
+| `pi.coding.model.duration`   | histogram, ms   | Assistant-message lifecycle, not native provider request duration            |
+| `pi.coding.tool.results`     | counter         | Tool terminal result; outcome and executed metadata                          |
 
 ## Counters versus durable totals
 

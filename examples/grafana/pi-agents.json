@@ -5,20 +5,156 @@
   "schemaVersion": 39,
   "version": 1,
   "refresh": "30s",
-  "time": {"from": "now-1h", "to": "now"},
-  "templating": {"list": [
-    {"name": "metrics", "type": "datasource", "query": "prometheus", "label": "Prometheus"},
-    {"name": "namespace", "type": "query", "datasource": {"type": "prometheus", "uid": "$metrics"}, "query": "label_values(pi_otel_heartbeat_seconds, service_namespace)", "refresh": 1},
-    {"name": "agent", "type": "query", "datasource": {"type": "prometheus", "uid": "$metrics"}, "query": "label_values(pi_otel_heartbeat_seconds{service_namespace=\"$namespace\"}, service_name)", "multi": true, "includeAll": true, "allValue": ".*", "refresh": 1}
-  ]},
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "metrics",
+        "type": "datasource",
+        "query": "prometheus",
+        "label": "Prometheus"
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "$metrics" },
+        "query": "label_values(pi_otel_heartbeat_seconds, service_namespace)",
+        "refresh": 1
+      },
+      {
+        "name": "agent",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "$metrics" },
+        "query": "label_values(pi_otel_heartbeat_seconds{service_namespace=\"$namespace\"}, service_name)",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "refresh": 1
+      }
+    ]
+  },
   "panels": [
-    {"id": 1, "title": "Exporter freshness (seconds, not an uptime probe)", "type": "stat", "gridPos": {"x": 0, "y": 0, "w": 8, "h": 5}, "datasource": {"type": "prometheus", "uid": "$metrics"}, "fieldConfig": {"defaults": {"unit": "s", "noValue": "No telemetry"}}, "targets": [{"refId": "A", "expr": "time() - max by(service_name) (pi_otel_heartbeat_seconds{service_namespace=\"$namespace\",service_name=~\"$agent\"})", "legendFormat": "{{service_name}}", "instant": true}]},
-    {"id": 2, "title": "Persisted Durable reported tokens (not live rate)", "type": "stat", "gridPos": {"x": 8, "y": 0, "w": 8, "h": 5}, "datasource": {"type": "prometheus", "uid": "$metrics"}, "fieldConfig": {"defaults": {"noValue": "No telemetry"}}, "targets": [{"refId": "A", "expr": "sum by(service_name,kind) (max by(service_name,provider,model,kind) (pi_otel_usage_tokens_token{service_namespace=\"$namespace\",service_name=~\"$agent\"}))", "legendFormat": "{{service_name}} {{kind}}", "instant": true}]},
-    {"id": 3, "title": "Node RSS (not children)", "type": "stat", "gridPos": {"x": 16, "y": 0, "w": 8, "h": 5}, "datasource": {"type": "prometheus", "uid": "$metrics"}, "fieldConfig": {"defaults": {"unit": "bytes", "noValue": "No telemetry"}}, "targets": [{"refId": "A", "expr": "max by(service_name) (pi_otel_process_memory_rss_bytes{service_namespace=\"$namespace\",service_name=~\"$agent\"})", "legendFormat": "{{service_name}}", "instant": true}]},
-    {"id": 4, "title": "Observed live reported token rate", "type": "timeseries", "gridPos": {"x": 0, "y": 5, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "$metrics"}, "fieldConfig": {"defaults": {"noValue": "No telemetry"}}, "targets": [{"refId": "A", "expr": "sum by(service_name,kind) (rate(pi_ai_tokens_token_total{service_namespace=\"$namespace\",service_name=~\"$agent\"}[5m]))", "legendFormat": "{{service_name}} {{kind}}"}]},
-    {"id": 5, "title": "Durable request p95 (milliseconds)", "type": "timeseries", "gridPos": {"x": 12, "y": 5, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "$metrics"}, "fieldConfig": {"defaults": {"unit": "ms", "noValue": "No telemetry"}}, "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by(le,service_name) (rate(pi_ai_request_duration_milliseconds_bucket{service_namespace=\"$namespace\",service_name=~\"$agent\"}[5m])))", "legendFormat": "{{service_name}}"}]},
-    {"id": 6, "title": "Tool attempts (not exactly-once effects)", "type": "timeseries", "gridPos": {"x": 0, "y": 13, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "$metrics"}, "fieldConfig": {"defaults": {"noValue": "No telemetry"}}, "targets": [{"refId": "A", "expr": "sum by(service_name,tool,phase,outcome) (increase(pi_otel_tool_attempts_total{service_namespace=\"$namespace\",service_name=~\"$agent\"}[15m]))", "legendFormat": "{{service_name}} {{tool}} {{phase}} {{outcome}}"}]},
-    {"id": 7, "title": "Export errors observed by a reachable receiver", "type": "timeseries", "gridPos": {"x": 12, "y": 13, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "$metrics"}, "fieldConfig": {"defaults": {"noValue": "No telemetry"}}, "targets": [{"refId": "A", "expr": "sum by(service_name,signal) (rate(pi_otel_export_errors_total{service_namespace=\"$namespace\",service_name=~\"$agent\"}[5m]))", "legendFormat": "{{service_name}} {{signal}}"}]},
-    {"id": 8, "title": "Interpretation", "type": "text", "gridPos": {"x": 0, "y": 21, "w": 24, "h": 5}, "options": {"mode": "markdown", "content": "Missing instrumentation stays missing. Idle agents need not have model/tool observations. Persisted usage gauges require observeDurable(); use maxima across overlapping instances, not sums. USD is Pi-reported cost, not an invoice. Traces/logs require separate data sources. Coding message timing is not native Durable request timing."}}
+    {
+      "id": 1,
+      "title": "Exporter freshness (seconds, not an uptime probe)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "$metrics" },
+      "fieldConfig": { "defaults": { "unit": "s", "noValue": "No telemetry" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - max by(service_name) (pi_otel_heartbeat_seconds{service_namespace=\"$namespace\",service_name=~\"$agent\"})",
+          "legendFormat": "{{service_name}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Persisted Durable reported tokens (not live rate)",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 0, "w": 8, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "$metrics" },
+      "fieldConfig": { "defaults": { "noValue": "No telemetry" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(service_name,kind) (max by(service_name,provider,model,kind) (pi_otel_usage_tokens_token{service_namespace=\"$namespace\",service_name=~\"$agent\"}))",
+          "legendFormat": "{{service_name}} {{kind}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Node RSS (not children)",
+      "type": "stat",
+      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "$metrics" },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes", "noValue": "No telemetry" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by(service_name) (pi_otel_process_memory_rss_bytes{service_namespace=\"$namespace\",service_name=~\"$agent\"})",
+          "legendFormat": "{{service_name}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Observed live reported token rate",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 5, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "$metrics" },
+      "fieldConfig": { "defaults": { "noValue": "No telemetry" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(service_name,kind) (rate(pi_ai_tokens_token_total{service_namespace=\"$namespace\",service_name=~\"$agent\"}[5m]))",
+          "legendFormat": "{{service_name}} {{kind}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Durable request p95 (milliseconds)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 5, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "$metrics" },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "noValue": "No telemetry" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(le,service_name) (rate(pi_ai_request_duration_milliseconds_bucket{service_namespace=\"$namespace\",service_name=~\"$agent\"}[5m])))",
+          "legendFormat": "{{service_name}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Tool attempts (not exactly-once effects)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "$metrics" },
+      "fieldConfig": { "defaults": { "noValue": "No telemetry" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(service_name,tool,phase,outcome) (increase(pi_otel_tool_attempts_total{service_namespace=\"$namespace\",service_name=~\"$agent\"}[15m]))",
+          "legendFormat": "{{service_name}} {{tool}} {{phase}} {{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Export errors observed by a reachable receiver",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "$metrics" },
+      "fieldConfig": { "defaults": { "noValue": "No telemetry" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(service_name,signal) (rate(pi_otel_export_errors_total{service_namespace=\"$namespace\",service_name=~\"$agent\"}[5m]))",
+          "legendFormat": "{{service_name}} {{signal}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Interpretation",
+      "type": "text",
+      "gridPos": { "x": 0, "y": 21, "w": 24, "h": 5 },
+      "options": {
+        "mode": "markdown",
+        "content": "Missing instrumentation stays missing. Idle agents need not have model/tool observations. Persisted usage gauges require observeDurable(); use maxima across overlapping instances, not sums. USD is Pi-reported cost, not an invoice. Traces/logs require separate data sources. Coding message timing is not native Durable request timing."
+      }
+    }
   ]
 }

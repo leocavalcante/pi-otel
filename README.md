@@ -44,14 +44,21 @@ Another application can install that built directory with `npm install /path/to/
 Pass telemetry to your **existing** Harness owner:
 
 ```ts
-import { createPiOtel } from '@leocavalcante/pi-otel';
+import { createPiOtel } from "@leocavalcante/pi-otel";
 
-const otel = createPiOtel({ serviceName: 'my-agent', serviceNamespace: 'agents' });
-const harness = await Harness.open(storage, {
-  models,
-  registry,
-  telemetry: otel.telemetry,
-}, context);
+const otel = createPiOtel({
+  serviceName: "my-agent",
+  serviceNamespace: "agents",
+});
+const harness = await Harness.open(
+  storage,
+  {
+    models,
+    registry,
+    telemetry: otel.telemetry,
+  },
+  context,
+);
 
 // Optional: sample durable totals through this owner. Does not open another Harness.
 await otel.observeDurable(harness, context);
@@ -76,16 +83,16 @@ The returned object exposes `telemetry`, `modelRuntime`, `observeDurable`, `obse
 
 OTLP uses JSON over HTTP(S). Each signal has its own exporter. Standard SDK environment variables include:
 
-| Variable | Purpose |
-|---|---|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Base URL; `/v1/traces`, `/v1/metrics`, `/v1/logs` are appended |
-| `OTEL_EXPORTER_OTLP_{TRACES,METRICS,LOGS}_ENDPOINT` | Complete per-signal URL; overrides the base |
-| `OTEL_EXPORTER_OTLP_HEADERS` | Authentication headers, handled by upstream exporters; never attributes |
-| `OTEL_EXPORTER_OTLP_{TRACES,METRICS,LOGS}_HEADERS` | Per-signal header override |
-| `OTEL_SERVICE_NAME` | Non-sensitive service identifier |
-| `OTEL_RESOURCE_ATTRIBUTES` | Only `service.namespace` and `service.version` are retained |
-| `OTEL_METRIC_EXPORT_INTERVAL` | Milliseconds; default 15000, minimum 1000 |
-| `OTEL_SDK_DISABLED` | `true` disables export |
+| Variable                                            | Purpose                                                                 |
+| --------------------------------------------------- | ----------------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                       | Base URL; `/v1/traces`, `/v1/metrics`, `/v1/logs` are appended          |
+| `OTEL_EXPORTER_OTLP_{TRACES,METRICS,LOGS}_ENDPOINT` | Complete per-signal URL; overrides the base                             |
+| `OTEL_EXPORTER_OTLP_HEADERS`                        | Authentication headers, handled by upstream exporters; never attributes |
+| `OTEL_EXPORTER_OTLP_{TRACES,METRICS,LOGS}_HEADERS`  | Per-signal header override                                              |
+| `OTEL_SERVICE_NAME`                                 | Non-sensitive service identifier                                        |
+| `OTEL_RESOURCE_ATTRIBUTES`                          | Only `service.namespace` and `service.version` are retained             |
+| `OTEL_METRIC_EXPORT_INTERVAL`                       | Milliseconds; default 15000, minimum 1000                               |
+| `OTEL_SDK_DISABLED`                                 | `true` disables export                                                  |
 
 Factory `endpoint`, `serviceName`, `serviceNamespace` and `serviceVersion` options override their base environment defaults. Per-signal endpoint variables still take precedence. Embedded URL credentials, query parameters and fragments are rejected. For remote receivers use normally verified HTTPS; never disable certificate verification.
 
