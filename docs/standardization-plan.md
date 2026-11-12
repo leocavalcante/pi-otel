@@ -1,6 +1,6 @@
 # Standardization plan: pi-otel
 
-Status: in progress, 2026-11-12. Target: [Pi extension standard v1](pi-extension-standard.md). Delete this file once every step is done.
+Status: done except gallery media, 2026-11-12. Target: [Pi extension standard v1](pi-extension-standard.md). Delete this file once every step is done.
 
 ## Progress
 
@@ -12,6 +12,7 @@ Status: in progress, 2026-11-12. Target: [Pi extension standard v1](pi-extension
 - Steps 4–6 merged: Prettier ([PR #9](https://github.com/leocavalcante/pi-otel/pull/9)), the blame-ignore file ([PR #10](https://github.com/leocavalcante/pi-otel/pull/10)), and typescript-eslint with `noUncheckedIndexedAccess` ([PR #11](https://github.com/leocavalcante/pi-otel/pull/11)).
 - Step 7 is the README rewrite and community files, released as a patch through `docs(readme)`.
 - Step 8 is done except for gallery media. `0.0.0-stage` is deprecated, publishing requires 2FA and disallows tokens, and full-SHA pinning is required. Still to do: add `pi.image` and upload the social preview by hand.
+- Later shared conventions, now in every repository: #13 (`engines.pi` read by `pi-min`, the `setup-test-tools.sh` hook, `--if-present` builds), #14 (the `release` label for release-failure issues, after GitHub rejected the default `semantic-release` label), and #15 (`pi-pins.json` support in `install-pi.ts`).
 - pi-ttyd is archived and deprecated on npm.
 - Dependabot uses a 7-day cooldown for Bun and Actions updates to satisfy zizmor, and its long pull request titles are exempt from the 72-character limit.
 
