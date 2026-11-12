@@ -11,11 +11,24 @@ import { join } from "node:path";
 interface PackageManifest {
   dependencies: Record<string, string>;
   devDependencies: Record<string, string>;
+  engines?: { pi?: string };
 }
 
-const requested = process.argv[2];
+const manifest = JSON.parse(
+  readFileSync("package.json", "utf8"),
+) as PackageManifest;
+
+// "min" reads the minimum supported Pi from `engines.pi` (for example ">=1.1.0"),
+// so the shared CI workflow needs no repository-specific version.
+let requested = process.argv[2];
+if (requested === "min") {
+  requested = /^>=\s*(\d+\.\d+\.\d+)$/.exec(manifest.engines?.pi ?? "")?.[1];
+  if (!requested) {
+    throw new Error('Declare the minimum Pi as engines.pi ">=x.y.z".');
+  }
+}
 if (!requested || !/^(?:latest|\d+\.\d+\.\d+)$/.test(requested)) {
-  throw new Error("Expected a stable Pi version or latest.");
+  throw new Error("Expected min, latest, or a stable Pi version.");
 }
 
 let version = requested;
@@ -34,16 +47,13 @@ if (requested === "latest") {
     throw new Error("Expected a stable Pi version.");
 }
 
-const manifest = JSON.parse(
-  readFileSync("package.json", "utf8"),
-) as PackageManifest;
 for (const [name] of Object.entries(manifest.devDependencies)) {
   if (name.startsWith("@earendil-works/"))
     manifest.devDependencies[name] = version;
 }
-// Keep runtime dependencies pinned: test the SDK version consumers actually use
-// with the telemetry runtime this package actually ships.
-const directory = mkdtempSync(join(tmpdir(), "pi-otel-sdk-"));
+// Keep runtime dependencies pinned: test the Pi version consumers use with the
+// runtime dependencies this package ships.
+const directory = mkdtempSync(join(tmpdir(), "pi-sdk-"));
 try {
   writeFileSync(
     join(directory, "package.json"),
