@@ -26,8 +26,9 @@ test("real OTLP/HTTP exports all signals, strips content/error details, preserve
       },
       async (parent) => {
         carrier = parent.propagation!.inject(parent);
-        assert(carrier?.traceparent);
-        assert.equal(carrier?.baggage, undefined);
+        assert(carrier);
+        assert(carrier.traceparent);
+        assert.equal(carrier.baggage, undefined);
         parent.addEvent("pi.durable.entry", {
           "entry.id": 9,
           "entry.kind": "pi.user",
@@ -89,7 +90,7 @@ test("real OTLP/HTTP exports all signals, strips content/error details, preserve
           resumed: true,
         },
       },
-      () => {},
+      () => undefined,
     );
     assert(await otel.forceFlush());
     assert(sink.requests.some((request) => request.path === "/v1/traces"));
@@ -116,7 +117,12 @@ test("real OTLP/HTTP exports all signals, strips content/error details, preserve
           attribute.value.stringValue === "request",
       ),
     );
-    assert.equal(resumedSpan.traceId, carrier!.traceparent.split("-")[1]);
+    assert(resumedSpan);
+    assert(carrier);
+    assert(carrier.traceparent);
+    const traceId = carrier.traceparent.split("-")[1];
+    assert(traceId);
+    assert.equal(resumedSpan.traceId, traceId);
     const tokens = metrics(sink.requests).find(
       (metric) => metric.name === "pi.ai.tokens",
     );
@@ -168,9 +174,9 @@ test("persistent usage is sampled through a supplied owner, not replayed as coun
   try {
     await otel.observeDurable(
       {
-        async usage() {
+        usage() {
           reads++;
-          return {
+          return Promise.resolve({
             models: {
               "synthetic/example": {
                 input: 100,
@@ -180,7 +186,7 @@ test("persistent usage is sampled through a supplied owner, not replayed as coun
                 cost: { total: 0.01 },
               },
             },
-          };
+          });
         },
       },
       undefined,

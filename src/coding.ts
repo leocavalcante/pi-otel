@@ -27,6 +27,10 @@ export interface CodingEvent {
 export interface CodingSource {
   subscribe(listener: (event: CodingEvent) => void): () => void;
 }
+type TelemetryContextWithMetrics = TelemetryContext & {
+  readonly metrics: NonNullable<TelemetryContext["metrics"]>;
+};
+
 function active(
   parent: TelemetryContext,
   name: string,
@@ -42,7 +46,7 @@ function active(
       span = value;
       return completed;
     })
-    .catch(() => {});
+    .catch(() => undefined);
   let ended = false;
   return {
     span,
@@ -55,28 +59,32 @@ function active(
     },
   };
 }
-export function codingObserver(telemetry: TelemetryContext, meter: Meter) {
+export function codingObserver(
+  telemetry: TelemetryContextWithMetrics,
+  meter: Meter,
+) {
   let run: ReturnType<typeof active> | undefined;
   let model: ReturnType<typeof active> | undefined;
   let first = false;
   const tools = new Map<string, ReturnType<typeof active>>();
-  const tokens = telemetry.metrics!.counter("pi.ai.tokens", { unit: "token" });
-  const cost = telemetry.metrics!.counter("pi.ai.cost", { unit: "USD" });
-  const modelDuration = telemetry.metrics!.histogram(
+  const tokens = telemetry.metrics.counter("pi.ai.tokens", { unit: "token" });
+  const cost = telemetry.metrics.counter("pi.ai.cost", { unit: "USD" });
+  const modelDuration = telemetry.metrics.histogram(
     "pi.coding.model.duration",
     { unit: "ms" },
   );
-  const attempts = telemetry.metrics!.counter("pi.otel.tool.attempts");
-  const toolDuration = telemetry.metrics!.histogram("pi.otel.tool.duration", {
+  const attempts = telemetry.metrics.counter("pi.otel.tool.attempts");
+  const toolDuration = telemetry.metrics.histogram("pi.otel.tool.duration", {
     unit: "ms",
   });
-  const outcomes = telemetry.metrics!.counter("pi.coding.tool.results");
-  const runDuration = telemetry.metrics!.histogram("pi.coding.run.duration", {
+  const outcomes = telemetry.metrics.counter("pi.coding.tool.results");
+  const runDuration = telemetry.metrics.histogram("pi.coding.run.duration", {
     unit: "ms",
   });
   const live = meter.createObservableGauge("pi.coding.active");
-  const callback = (result: { observe(value: number): void }) =>
+  const callback = (result: { observe(value: number): void }) => {
     result.observe(run ? 1 : 0);
+  };
   live.addCallback(callback);
   const settle = (aborted: boolean) => {
     for (const tool of tools.values()) tool.end({ outcome: "aborted" });
@@ -131,6 +139,7 @@ export function codingObserver(telemetry: TelemetryContext, meter: Meter) {
             { provider: message.provider, model: message.model },
             ["provider", "model"],
           );
+          const stopReason = message.stopReason ?? "";
           const stop = [
             "stop",
             "length",
@@ -139,8 +148,8 @@ export function codingObserver(telemetry: TelemetryContext, meter: Meter) {
             "aborted",
             "deferred",
             "pending",
-          ].includes(message.stopReason ?? "")
-            ? message.stopReason!
+          ].includes(stopReason)
+            ? stopReason
             : "unknown";
           const usage = message.usage;
           if (usage) {
@@ -153,6 +162,8 @@ export function codingObserver(telemetry: TelemetryContext, meter: Meter) {
               if (Number.isFinite(usage[key]) && usage[key] >= 0)
                 tokens.add(usage[key], { ...labels, kind });
             }
+            // Events come from the Pi runtime, not from the type: a provider may omit cost.
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime data can lack the field.
             if (Number.isFinite(usage.cost?.total) && usage.cost.total >= 0)
               cost.add(usage.cost.total, labels);
           }
@@ -195,6 +206,9 @@ export function codingObserver(telemetry: TelemetryContext, meter: Meter) {
         if (event.type === "tool_execution_end" && event.toolCallId) {
           const current = tools.get(event.toolCallId);
           const outcome = event.isError ? "error" : "done";
+          const duration = event.durationMs;
+          const executed =
+            typeof duration === "number" && Number.isFinite(duration);
           const labels = pick(
             { tool: event.toolName, phase: "execute", outcome },
             ["tool", "phase", "outcome"],
@@ -203,10 +217,9 @@ export function codingObserver(telemetry: TelemetryContext, meter: Meter) {
           outcomes.add(1, {
             tool: labels.tool,
             outcome,
-            executed: Number.isFinite(event.durationMs),
+            executed,
           });
-          if (Number.isFinite(event.durationMs))
-            toolDuration.record(event.durationMs!, labels);
+          if (executed) toolDuration.record(duration, labels);
           if (event.isError)
             current?.span.setStatus({
               status: "error",
@@ -214,8 +227,8 @@ export function codingObserver(telemetry: TelemetryContext, meter: Meter) {
             });
           current?.end({
             outcome,
-            executed: Number.isFinite(event.durationMs),
-            duration_ms: event.durationMs,
+            executed,
+            duration_ms: duration,
           });
           tools.delete(event.toolCallId);
         }

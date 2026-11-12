@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { parse } from "yaml";
 
-type Workflow = {
+interface Workflow {
   permissions: Record<string, string>;
   jobs: Record<
     string,
@@ -13,7 +13,11 @@ type Workflow = {
       steps?: { uses?: string; run?: string; with?: Record<string, unknown> }[];
     }
   >;
-};
+}
+interface PackageManifest {
+  packageManager: string;
+  trustedDependencies: string[];
+}
 const directory = new URL("../.github/workflows/", import.meta.url);
 
 for (const file of readdirSync(directory).filter((file) =>
@@ -41,14 +45,16 @@ test("the required check includes every CI job and never hides failed prerequisi
   const ci = parse(
     readFileSync(new URL("ci.yaml", directory), "utf8"),
   ) as Workflow;
+  const required = ci.jobs.required;
+  assert(required);
   assert.deepEqual(
-    [...(ci.jobs.required.needs ?? [])].sort(),
+    [...(required.needs ?? [])].sort(),
     Object.keys(ci.jobs)
       .filter((name) => name !== "required")
       .sort(),
   );
-  assert.equal(ci.jobs.required.if, "always()");
-  const gate = ci.jobs.required.steps?.map((step) => step.run ?? "").join("\n");
+  assert.equal(required.if, "always()");
+  const gate = required.steps?.map((step) => step.run ?? "").join("\n");
   assert(gate?.includes('result !== "success"'));
   assert(gate?.includes('optional && result === "skipped"'));
 });
@@ -56,7 +62,7 @@ test("the required check includes every CI job and never hides failed prerequisi
 test("the development toolchain is Bun but runtime sources do not import Bun APIs", () => {
   const manifest = JSON.parse(
     readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-  );
+  ) as PackageManifest;
   assert.match(manifest.packageManager, /^bun@\d+\.\d+\.\d+$/);
   assert.deepEqual(manifest.trustedDependencies, []);
   for (const file of readdirSync(new URL("../src/", import.meta.url)).filter(

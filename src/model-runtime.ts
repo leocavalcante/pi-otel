@@ -1,6 +1,7 @@
 import {
   lazyStream,
   AI_TELEMETRY_SCHEMA,
+  type AssistantMessageEventStream,
   type Models,
   type Model,
   type Api,
@@ -53,7 +54,7 @@ function observer(
           return completed;
         },
       )
-      .catch(() => {});
+      .catch(() => undefined);
   } catch {
     /* Recording must not prevent request admission. */
   }
@@ -143,43 +144,59 @@ export function withModelRuntimeTelemetry<T extends Models>(
   runtime: T,
   telemetry: TelemetryContext,
 ): T {
-  const methods = new Map<PropertyKey, unknown>();
-  for (const name of ["stream", "streamSimple", "streamDeferred"] as const) {
-    methods.set(name, (...args: Parameters<Models["streamSimple"]>) => {
-      const model = args[0];
-      const options = args[2];
-      // Lazy forwarding preserves the original events/result and makes exactly one underlying call.
-      let observation: LazyStreamObserver | undefined;
-      try {
-        observation = observer(
-          model,
-          options?.telemetry ?? telemetry,
-          options && "reasoning" in options ? options.reasoning : undefined,
-          name === "streamDeferred",
-        );
-      } catch {}
-      return lazyStream(
+  // Forward each call exactly as received: every argument, the runtime as the
+  // receiver, and one lazy underlying call. Telemetry setup can never block it.
+  const forward = (
+    model: Model<Api>,
+    options: { readonly telemetry?: TelemetrySpan } | undefined,
+    poll: boolean,
+    setup: () => AssistantMessageEventStream,
+  ) => {
+    let observation: LazyStreamObserver | undefined;
+    try {
+      observation = observer(
         model,
-        async () => Reflect.apply(runtime[name], runtime, args),
-        observation,
+        options?.telemetry ?? telemetry,
+        options && "reasoning" in options ? options.reasoning : undefined,
+        poll,
       );
-    });
-  }
-  for (const [complete, stream] of [
-    ["complete", "stream"],
-    ["completeSimple", "streamSimple"],
-    ["fetchDeferred", "streamDeferred"],
-  ] as const) {
-    methods.set(complete, (...args: unknown[]) =>
-      Reflect.apply(methods.get(stream) as Function, undefined, args).result(),
+    } catch {
+      /* Observer setup must never affect request forwarding. */
+    }
+    return lazyStream(
+      model,
+      () =>
+        new Promise<AssistantMessageEventStream>((resolve) => {
+          resolve(setup());
+        }),
+      observation,
     );
-  }
+  };
+  const stream: Models["stream"] = (...args) =>
+    forward(args[0], args[2], false, () => runtime.stream(...args));
+  const streamSimple: Models["streamSimple"] = (...args) =>
+    forward(args[0], args[2], false, () => runtime.streamSimple(...args));
+  const streamDeferred: Models["streamDeferred"] = (...args) =>
+    forward(args[0], args[2], true, () => runtime.streamDeferred(...args));
+  const complete: Models["complete"] = (...args) => stream(...args).result();
+  const completeSimple: Models["completeSimple"] = (...args) =>
+    streamSimple(...args).result();
+  const fetchDeferred: Models["fetchDeferred"] = (...args) =>
+    streamDeferred(...args).result();
+  const methods = new Map<PropertyKey, unknown>([
+    ["stream", stream],
+    ["streamSimple", streamSimple],
+    ["streamDeferred", streamDeferred],
+    ["complete", complete],
+    ["completeSimple", completeSimple],
+    ["fetchDeferred", fetchDeferred],
+  ]);
   return new Proxy(runtime, {
     get(target, key) {
       if (methods.has(key)) return methods.get(key);
-      const value = Reflect.get(target, key, target);
+      const value: unknown = Reflect.get(target, key, target);
       if (typeof value !== "function" || key === "constructor") return value;
-      const bound = value.bind(target);
+      const bound: unknown = value.bind(target);
       methods.set(key, bound);
       return bound;
     },

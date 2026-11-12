@@ -27,7 +27,7 @@ const carrier = (context: SpanContext | undefined) =>
       }
     : null;
 const detached = <T>(value: T): T => structuredClone(value);
-const cases = createTelemetryAdapterConformance(async () => {
+const cases = createTelemetryAdapterConformance(() => {
   const spans: ReadableSpan[] = [];
   const ended = new Map<ReadableSpan, number>();
   const processor: SpanProcessor = {
@@ -37,8 +37,8 @@ const cases = createTelemetryAdapterConformance(async () => {
     onEnd: (span) => {
       ended.set(span, ended.size + 1);
     },
-    forceFlush: async () => {},
-    shutdown: async () => {},
+    forceFlush: () => Promise.resolve(),
+    shutdown: () => Promise.resolve(),
   };
   const provider = new TracerProvider({ spanProcessors: [processor] });
   const measurements: RecordedTelemetryMeasurement[] = [];
@@ -79,45 +79,47 @@ const cases = createTelemetryAdapterConformance(async () => {
     tracer: provider.getTracer("conformance"),
     meter,
   });
-  return {
+  return Promise.resolve({
     context: adapter,
     metrics: adapter.metrics,
     propagation: adapter.propagation,
-    getMetrics: async () => detached(measurements),
-    getSpans: async (): Promise<RecordedTelemetrySpan[]> =>
-      spans.map((span, index) => {
-        const parent = span.parentSpanContext;
-        const local = parent
-          ? spans.findIndex(
-              (candidate) =>
-                candidate.spanContext().spanId === parent.spanId &&
-                candidate.spanContext().traceId === parent.traceId,
-            )
-          : -1;
-        return {
-          id: index + 1,
-          parentId: local < 0 ? null : local + 1,
-          name: span.name,
-          context: carrier(span.spanContext())!,
-          parentContext: carrier(parent),
-          attributes: detached(span.attributes) as any,
-          events: span.events.map((event) => ({
-            name: event.name,
-            attributes: detached(event.attributes ?? {}) as any,
-          })),
-          links: span.links.map((link) => ({
-            context: carrier(link.context)!,
-            attributes: detached(link.attributes ?? {}) as any,
-          })),
-          status: adapter.statuses.get(span) ?? { status: "ok" },
-          settled: ended.has(span),
-          endSequence: ended.get(span),
-        };
-      }),
+    getMetrics: () => Promise.resolve(detached(measurements)),
+    getSpans: (): Promise<RecordedTelemetrySpan[]> =>
+      Promise.resolve(
+        spans.map((span, index) => {
+          const parent = span.parentSpanContext;
+          const local = parent
+            ? spans.findIndex(
+                (candidate) =>
+                  candidate.spanContext().spanId === parent.spanId &&
+                  candidate.spanContext().traceId === parent.traceId,
+              )
+            : -1;
+          return {
+            id: index + 1,
+            parentId: local < 0 ? null : local + 1,
+            name: span.name,
+            context: carrier(span.spanContext())!,
+            parentContext: carrier(parent),
+            attributes: detached(span.attributes) as any,
+            events: span.events.map((event) => ({
+              name: event.name,
+              attributes: detached(event.attributes ?? {}) as any,
+            })),
+            links: span.links.map((link) => ({
+              context: carrier(link.context)!,
+              attributes: detached(link.attributes ?? {}) as any,
+            })),
+            status: adapter.statuses.get(span) ?? { status: "ok" },
+            settled: ended.has(span),
+            endSequence: ended.get(span),
+          };
+        }),
+      ),
     async [Symbol.asyncDispose]() {
       await provider.shutdown();
     },
-  };
+  });
 });
 for (const current of cases)
   test(`Pi contract: ${current.group}: ${current.name}`, () => current.run());

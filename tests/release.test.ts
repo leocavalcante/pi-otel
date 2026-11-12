@@ -10,7 +10,7 @@ import { runGitCliff } from "git-cliff";
 const config = JSON.parse(
   readFileSync(new URL("../.releaserc.json", import.meta.url), "utf8"),
 );
-const analyzerName: string = "@semantic-release/commit-analyzer";
+const analyzerName = "@semantic-release/commit-analyzer";
 const { analyzeCommits } = await import(analyzerName);
 
 for (const [message, release] of [
@@ -29,11 +29,15 @@ for (const [message, release] of [
   ["ci: update runners", null],
   ["docs: update the maintainer guide", null],
 ] as const) {
-  test(`release rules: ${message.split("\n")[0]}`, async () => {
+  test(`release rules: ${message.split("\n")[0] ?? message}`, async () => {
     const result = await analyzeCommits(config.plugins[0][1], {
       cwd: fileURLToPath(new URL("..", import.meta.url)),
       commits: [{ hash: "fixture", message }],
-      logger: { log() {} },
+      logger: {
+        log() {
+          return undefined;
+        },
+      },
     });
     assert.equal(result, release);
   });
