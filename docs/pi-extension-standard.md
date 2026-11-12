@@ -519,7 +519,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: ci
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     environment: npm
     permissions:
       contents: write # tags and GitHub releases
@@ -578,7 +578,7 @@ jobs:
 
 Remove the `breaking` rule when the extension reaches 1.0. The devDependencies are `semantic-release`, `@semantic-release/commit-analyzer`, `@semantic-release/exec`, `@semantic-release/npm`, `@semantic-release/github`, `conventional-changelog-conventionalcommits`, and `git-cliff`, all with exact versions. `@semantic-release/npm` installs an npm CLI that supports trusted publishing; the release job runs it with lifecycle scripts disabled and builds explicitly beforehand.
 
-`.github/scripts/verify-published.mjs` polls the registry for up to two minutes after publishing and fails the release if the version or its SLSA provenance doesn't appear. pi-otel has the reference copy.
+`.github/scripts/verify-published.mjs` polls the registry for up to 15 minutes after publishing and fails the release if the version or its SLSA provenance doesn't appear. npm processes new versions before exposing them; pi-otel 0.1.4 took three minutes. pi-otel has the reference copy.
 
 ### A.7 cliff.toml (essentials)
 

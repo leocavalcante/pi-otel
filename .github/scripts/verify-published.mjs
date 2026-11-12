@@ -7,8 +7,10 @@ const version = process.argv[2];
 assert.match(version ?? "", /^\d+\.\d+\.\d+$/);
 const endpoint = `https://registry.npmjs.org/${encodeURIComponent(name)}/${version}`;
 
-// The registry can take a minute to expose a new version and its attestation.
-for (let attempt = 1; attempt <= 24; attempt++) {
+// npm processes new versions before exposing them; this has taken three
+// minutes in practice. Wait up to 15 minutes for the version and its attestation.
+const attempts = 90;
+for (let attempt = 1; attempt <= attempts; attempt++) {
   try {
     const response = await fetch(endpoint, {
       signal: AbortSignal.timeout(15000),
@@ -41,7 +43,12 @@ for (let attempt = 1; attempt <= 24; attempt++) {
     }
     console.log(`Registry check ${attempt} failed; retrying.`);
   }
-  await setTimeout(5000);
+  if (attempt % 6 === 0) {
+    console.log(
+      `Waiting for npm to process ${name}@${version} (${attempt * 10} seconds).`,
+    );
+  }
+  await setTimeout(10000);
 }
 throw new Error(
   `${name}@${version} or its provenance is not visible on npm. Check the publish job before retrying.`,
