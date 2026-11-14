@@ -1,6 +1,6 @@
 # AGENTS.md
 
-pi-otel: export metadata-only OpenTelemetry from Pi coding-agent sessions and Pi Durable agents.
+pi-otel: observe Pi sessions and Pi Durable agents with OpenTelemetry, exporting metadata only.
 
 ## Commands
 

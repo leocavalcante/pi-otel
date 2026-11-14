@@ -1,6 +1,6 @@
 # pi-otel
 
-Export metadata-only OpenTelemetry from Pi coding-agent sessions and Pi Durable agents.
+Observe Pi sessions and Pi Durable agents with OpenTelemetry, exporting metadata only.
 
 [![npm](https://img.shields.io/npm/v/@leocavalcante/pi-otel)](https://www.npmjs.com/package/@leocavalcante/pi-otel) [![CD](https://github.com/leocavalcante/pi-otel/actions/workflows/cd.yaml/badge.svg)](https://github.com/leocavalcante/pi-otel/actions/workflows/cd.yaml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/leocavalcante/pi-otel/blob/main/LICENSE)
 
@@ -14,6 +14,7 @@ pi-otel sends traces, metrics, and logs about model calls, timing, and tool acti
 - [Compatibility](#compatibility)
 - [Privacy and security](#privacy-and-security)
 - [Troubleshooting](#troubleshooting)
+- [More Pi extensions](#more-pi-extensions)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -158,6 +159,19 @@ Tests inject synthetic private markers into prompts, model output, tool argument
 - **Nothing reaches the collector.** Pi must start with `OTEL_EXPORTER_OTLP_ENDPOINT` already set, and `OTEL_SDK_DISABLED` must not be `true`. Run `/reload` after changing either, and check that the receiver accepts OTLP over HTTP.
 - **Metrics appear but traces or logs don't.** Check the per-signal endpoint variables: a per-signal URL replaces the base URL and its `/v1/...` suffix.
 - **Some exports were lost.** Watch the `pi.otel.export.errors` counter, which is labeled by signal.
+
+## More Pi extensions
+
+Each extension does one job, and all of them share the same conventions for code, tests, and releases. Combine the ones you need:
+
+| Extension                                                     | What it does                                                                              |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [pi-a2a](https://github.com/leocavalcante/pi-a2a)             | Talk to A2A agents from Pi, and serve Pi Durable agents over the A2A protocol.            |
+| [pi-otel](https://github.com/leocavalcante/pi-otel)           | Observe Pi sessions and Pi Durable agents with OpenTelemetry, exporting metadata only.    |
+| [pi-subagents](https://github.com/leocavalcante/pi-subagents) | Delegate tasks to isolated Pi subagents: single, parallel, chained, or in the background. |
+| [pi-tmux](https://github.com/leocavalcante/pi-tmux)           | Name tmux windows after your current Pi task and mark the ones waiting for your input.    |
+
+Install any of them with `pi install npm:@leocavalcante/<extension>`, then run `/reload`.
 
 ## Contributing
 
