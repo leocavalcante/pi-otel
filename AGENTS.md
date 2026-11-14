@@ -17,7 +17,7 @@ pi-otel: export metadata-only OpenTelemetry from Pi coding-agent sessions and Pi
 - Sign off every commit (`git commit -s`). Never add Co-Authored-By.
 - Never bump the version, edit CHANGELOG.md, create tags or releases, or publish. cd.yaml does that.
 - Code in src/ runs on Node.js inside Pi: use `node:*` APIs, never Bun APIs.
-- Keep Pi host packages (`@earendil-works/pi-ai`, `pi-coding-agent`) as `"*"` peer dependencies, never dependencies.
+- Keep Pi host packages, such as `@earendil-works/pi-coding-agent` and `typebox`, as `"*"` peer dependencies, never dependencies.
 - Tests make no network or paid model calls.
 - Update README.md and CONTRIBUTING.md with every behavior change, in the voice from standard §10.
 
