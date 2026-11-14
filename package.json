@@ -1,15 +1,7 @@
 {
   "name": "@leocavalcante/pi-otel",
   "version": "0.0.0-development",
-  "description": "Export metadata-only OpenTelemetry from Pi coding-agent sessions and Pi Durable agents.",
-  "type": "module",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/leocavalcante/pi-otel.git"
-  },
-  "homepage": "https://github.com/leocavalcante/pi-otel#readme",
-  "bugs": "https://github.com/leocavalcante/pi-otel/issues",
+  "description": "Observe Pi sessions and Pi Durable agents with OpenTelemetry, exporting metadata only.",
   "keywords": [
     "pi-extension",
     "pi-package",
@@ -22,10 +14,15 @@
     "tracing",
     "telemetry"
   ],
-  "engines": {
-    "node": ">=22.19.0",
-    "pi": ">=1.5.0"
+  "homepage": "https://github.com/leocavalcante/pi-otel#readme",
+  "bugs": "https://github.com/leocavalcante/pi-otel/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leocavalcante/pi-otel.git"
   },
+  "license": "MIT",
+  "author": "Leo Cavalcante (https://github.com/leocavalcante)",
+  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -33,17 +30,6 @@
     },
     "./extension": "./dist/extension.js",
     "./package.json": "./package.json"
-  },
-  "pi": {
-    "extensions": [
-      "./src/extension.ts"
-    ]
-  },
-  "packageManager": "bun@1.4.4",
-  "trustedDependencies": [],
-  "publishConfig": {
-    "access": "public",
-    "provenance": true
   },
   "files": [
     "dist",
@@ -110,5 +96,20 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.2",
     "yaml": "2.9.1"
+  },
+  "engines": {
+    "node": ">=22.19.0",
+    "pi": ">=1.5.0"
+  },
+  "packageManager": "bun@1.4.4",
+  "trustedDependencies": [],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "pi": {
+    "extensions": [
+      "./src/extension.ts"
+    ]
   }
 }

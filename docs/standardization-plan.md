@@ -22,7 +22,7 @@ pi-otel is the pilot. It goes first because npm users are on a broken release, a
 
 | Field                   | Value                                                                                                                                       |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Description             | Export metadata-only OpenTelemetry from Pi coding-agent sessions and Pi Durable agents.                                                     |
+| Description             | Observe Pi sessions and Pi Durable agents with OpenTelemetry, exporting metadata only.                                                      |
 | Topics and npm keywords | `pi-extension` `pi-package` `pi-coding-agent` `pi-durable` `opentelemetry` `otlp` `observability` `llm-observability` `tracing` `telemetry` |
 | Website                 | https://pi.dev/packages/@leocavalcante/pi-otel                                                                                              |
 | Kind                    | Extension and SDK: Pi loads `src/extension.ts`, and Node.js consumers import `dist/`                                                        |
