@@ -110,6 +110,7 @@
   "pi": {
     "extensions": [
       "./src/extension.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/leocavalcante/pi-otel/main/.github/media/preview.png"
   }
 }
