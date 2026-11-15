@@ -6,6 +6,8 @@ Observe Pi sessions and Pi Durable agents with OpenTelemetry, exporting metadata
 
 pi-otel sends traces, metrics, and logs about model calls, timing, and tool activity to your own OpenTelemetry collector. Each agent run becomes a `pi.coding.run` span with `pi.coding.model` and `pi.coding.tool` children, plus token and cost counters per provider and model. pi-otel exports metadata only: it never exports prompts, answers, tool arguments, or tool results.
 
+![pi-otel preview: a pi.coding.run trace with model and tool spans, token and cost metrics, exported as metadata only](https://raw.githubusercontent.com/leocavalcante/pi-otel/main/.github/media/preview.png)
+
 ## Contents
 
 - [Installation](#installation)
