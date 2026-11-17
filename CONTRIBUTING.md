@@ -9,7 +9,7 @@ bun install --frozen-lockfile
 bun run verify
 ```
 
-`verify` checks source, tests, and examples; runs the Bun and Node.js test lanes; builds and validates the package in an isolated consumer; and audits dependencies. Audits block high and critical vulnerabilities. Run `bun audit` to review all severities, including moderate advisories in development tooling.
+`verify` checks source, tests, and examples; runs the Bun and Node.js test lanes; builds and validates the package in an isolated consumer; and audits dependencies. Audits block high and critical vulnerabilities. Run `bun audit` to review all severities, including moderate advisories in development tooling. The audit ignores [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf), a picomatch ReDoS with no patched release. Only development tooling, such as semantic-release and typescript-eslint, uses picomatch; no runtime dependency of the published package does. Remove the ignore from `verify` and CI once a fixed version ships.
 
 `bun run lint` runs Prettier and ESLint (typescript-eslint `strictTypeChecked`), and `bun run format` applies their fixes. Disable a rule only on the line that needs it, with a reason. Tests may relax only the unsafe-any rules, because they inspect untyped OTLP payloads.
 
