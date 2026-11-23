@@ -52,7 +52,7 @@
     "verify": "bun run lint && bun run check && bun run test && bun run check:package && bun audit --audit-level=high --ignore=GHSA-fc5q-39xc-vjpf"
   },
   "dependencies": {
-    "@earendil-works/pi-telemetry": "1.5.2",
+    "@earendil-works/pi-telemetry": "1.6.0",
     "@opentelemetry/api": "1.10.0",
     "@opentelemetry/core": "3.1.0",
     "@opentelemetry/resources": "3.1.0",
