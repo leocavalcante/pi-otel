@@ -52,6 +52,14 @@ export function spans(
     .flatMap((resource) => resource.scopeSpans ?? [])
     .flatMap((scope) => scope.spans ?? []);
 }
+export function labels(record: any): Record<string, string | undefined> {
+  return Object.fromEntries(
+    (record.attributes ?? []).map(({ key, value }: any) => [
+      key,
+      value.stringValue,
+    ]),
+  );
+}
 export function metrics(
   requests: Awaited<ReturnType<typeof receiver>>["requests"],
 ): any[] {

@@ -18,7 +18,7 @@ import {
 } from "@earendil-works/pi-durable";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createPiOtel } from "../src/index.ts";
-import { receiver, spans, metrics } from "./receiver.ts";
+import { labels, receiver, spans, metrics } from "./receiver.ts";
 
 test("SDK ModelRuntime preserves its auth/forwarding path and exports each model request exactly once", async () => {
   const sink = await receiver();
@@ -33,11 +33,16 @@ test("SDK ModelRuntime preserves its auth/forwarding path and exports each model
   const faux = fauxProvider({ tokensPerSecond: 100000 });
   runtime.registerNativeProvider(faux.provider);
   const PRIVATE = "SYNTHETIC_PRIVATE_MODEL_RUNTIME_CONTENT";
+  const model = faux.getModel();
+  const allowedIds = ["fixture/Model.A-1", "fixture/Model.B-2"] as const;
   faux.setResponses([
-    fauxAssistantMessage(fauxToolCall("example_tool", { text: PRIVATE }), {
-      stopReason: "toolUse",
-    }),
-    fauxAssistantMessage(PRIVATE),
+    {
+      ...fauxAssistantMessage(fauxToolCall("example_tool", { text: PRIVATE }), {
+        stopReason: "toolUse",
+      }),
+      responseModel: allowedIds[0],
+    },
+    { ...fauxAssistantMessage(PRIVATE), responseModel: allowedIds[1] },
   ]);
   const registry = createRegistry();
   registry.install(
@@ -60,7 +65,10 @@ test("SDK ModelRuntime preserves its auth/forwarding path and exports each model
       ],
     }),
   );
-  const otel = createPiOtel({ endpoint: sink.endpoint });
+  const otel = createPiOtel({
+    endpoint: sink.endpoint,
+    responseModels: { provider: model.provider, model: model.id, allowedIds },
+  });
   const models = otel.modelRuntime(runtime);
   const context = BACKGROUND_CONTEXT;
   const harness = await Harness.open(
@@ -74,7 +82,6 @@ test("SDK ModelRuntime preserves its auth/forwarding path and exports each model
     context,
   );
   try {
-    const model = faux.getModel();
     const root = await harness.root(context, {
       agent: { model: { provider: model.provider, modelId: model.id } },
     });
@@ -90,28 +97,34 @@ test("SDK ModelRuntime preserves its auth/forwarding path and exports each model
       "done",
     );
     assert.equal(faux.state.callCount, 2);
+    assert.deepEqual(Object.keys((await harness.usage(context)).models), [
+      `${model.provider}/${model.id}`,
+    ]);
     assert(await otel.forceFlush());
-    assert.equal(
-      spans(sink.requests).filter((span) => span.name === "pi.ai.request")
-        .length,
-      2,
+    const requests = spans(sink.requests)
+      .filter((span) => span.name === "pi.ai.request")
+      .map(labels);
+    assert.deepEqual(
+      requests.map((span) => span["gen_ai.response.model"]),
+      allowedIds,
     );
+    assert(requests.every((span) => span.model === model.id));
     const durations = metrics(sink.requests).find(
       (metric) => metric.name === "pi.ai.request.duration",
     );
     assert(durations);
-    assert.equal(
-      durations.histogram.dataPoints.reduce(
-        (sum: number, point: any) => sum + Number(point.count),
-        0,
-      ),
-      2,
+    const points = durations.histogram.dataPoints;
+    assert.equal(points.length, 2);
+    assert.deepEqual(
+      points.map((point: any) => labels(point)["gen_ai.response.model"]),
+      allowedIds,
     );
-    assert(
-      metrics(sink.requests).some(
-        (metric) => metric.name === "pi.ai.first_chunk.duration",
-      ),
+    assert(points.every((point: any) => Number(point.count) === 1));
+    const first = metrics(sink.requests).find(
+      (metric) => metric.name === "pi.ai.first_chunk.duration",
     );
+    assert(first);
+    assert(!JSON.stringify(first).includes("gen_ai.response.model"));
     assert(!JSON.stringify(sink.requests).includes(PRIVATE));
   } finally {
     await harness.close(context);

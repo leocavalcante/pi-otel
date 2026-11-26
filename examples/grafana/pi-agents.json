@@ -3,7 +3,7 @@
   "title": "Pi agents",
   "tags": ["pi", "opentelemetry"],
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "time": { "from": "now-1h", "to": "now" },
   "templating": {
@@ -153,8 +153,31 @@
       "gridPos": { "x": 0, "y": 21, "w": 24, "h": 5 },
       "options": {
         "mode": "markdown",
-        "content": "Missing instrumentation stays missing. Idle agents need not have model/tool observations. Persisted usage gauges require observeDurable(); use maxima across overlapping instances, not sums. USD is Pi-reported cost, not an invoice. Traces/logs require separate data sources. Coding message timing is not native Durable request timing."
+        "content": "Missing instrumentation stays missing. Idle agents need not have model/tool observations. Persisted usage gauges stay keyed to the requested model and require observeDurable(); use maxima across overlapping instances, not sums. USD is Pi-reported cost, not an invoice. Traces/logs require separate data sources. Coding message timing is not native Durable request timing."
       }
+    },
+    {
+      "id": 9,
+      "title": "Live request rate by reported model",
+      "description": "The histogram counts logical requests, including tool rounds. No response label includes fixed models, missing IDs, and agents without attribution configured.",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 26, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "$metrics" },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "noValue": "No telemetry" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(service_name,provider,model,gen_ai_response_model) (rate(pi_ai_request_duration_milliseconds_count{service_namespace=\"$namespace\",service_name=~\"$agent\",gen_ai_response_model!=\"\"}[$__rate_interval]))",
+          "legendFormat": "{{service_name}} {{provider}}/{{model}} → {{gen_ai_response_model}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by(service_name,provider,model) (rate(pi_ai_request_duration_milliseconds_count{service_namespace=\"$namespace\",service_name=~\"$agent\",gen_ai_response_model=\"\"}[$__rate_interval]))",
+          "legendFormat": "{{service_name}} {{provider}}/{{model}} (no response label)"
+        }
+      ]
     }
   ]
 }

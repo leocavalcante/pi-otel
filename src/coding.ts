@@ -5,7 +5,11 @@ import type {
   SpanAttributes,
 } from "@earendil-works/pi-telemetry";
 import type { UsageValue } from "./index.ts";
-import { pick } from "./privacy.ts";
+import {
+  pick,
+  responseModelAttributes,
+  type ResponseModelPolicy,
+} from "./privacy.ts";
 
 /** Only fields read by the observer. Message content, args, results and errors are deliberately absent. */
 export interface CodingEvent {
@@ -14,6 +18,7 @@ export interface CodingEvent {
     role: string;
     provider?: string;
     model?: string;
+    responseModel?: string;
     stopReason?: string;
     usage?: UsageValue;
   };
@@ -62,6 +67,7 @@ function active(
 export function codingObserver(
   telemetry: TelemetryContextWithMetrics,
   meter: Meter,
+  policy?: ResponseModelPolicy,
 ) {
   let run: ReturnType<typeof active> | undefined;
   let model: ReturnType<typeof active> | undefined;
@@ -135,10 +141,18 @@ export function codingObserver(
           event.message?.role === "assistant"
         ) {
           const message = event.message;
-          const labels = pick(
-            { provider: message.provider, model: message.model },
-            ["provider", "model"],
-          );
+          const labels = {
+            ...pick({ provider: message.provider, model: message.model }, [
+              "provider",
+              "model",
+            ]),
+            ...responseModelAttributes(
+              policy,
+              message.provider,
+              message.model,
+              message.responseModel,
+            ),
+          };
           const stopReason = message.stopReason ?? "";
           const stop = [
             "stop",

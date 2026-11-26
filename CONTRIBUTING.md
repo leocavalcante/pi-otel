@@ -19,7 +19,9 @@ bun run test:node
 pi -e ./src/extension.ts
 ```
 
-Both test lanes clear inherited OpenTelemetry settings before running. Integration tests use local HTTP receivers and faux models. They make no paid model calls and export no real session content.
+Both test lanes clear inherited OpenTelemetry settings before running. Integration tests use local HTTP receivers, faux providers, and mocked Chat streams. They make no remote model calls and export no real session content.
+
+When changing response-model attribution, test native `createModels()` with overlapping requests under the same telemetry parent. Inspect OTLP payloads for the exact usage and one request span per call. Keep the provider notification scalar: report the first distinct ID with the request's telemetry scope, never the parent or a full event. Test the final-message path for SDK ModelRuntime and coding events separately. Do not add response-model labels to first-chunk timing, persisted usage, or non-model signals.
 
 When changing workflows, run the same checks as CI on Linux:
 

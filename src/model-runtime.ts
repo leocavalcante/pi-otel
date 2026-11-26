@@ -9,10 +9,47 @@ import {
 } from "@earendil-works/pi-ai";
 import {
   createTypedMetrics,
+  defineTelemetrySchema,
   NOOP_TELEMETRY_METRICS,
   type TelemetryContext,
   type TelemetrySpan,
 } from "@earendil-works/pi-telemetry";
+import { modelsFacade } from "./models-facade.ts";
+import {
+  RESPONSE_MODEL,
+  responseModelAttributes,
+  type ResponseModelPolicy,
+} from "./privacy.ts";
+
+const responseModel = {
+  type: "string",
+  description: "Allowlisted provider-reported model identifier.",
+  required: false,
+} as const;
+const piMetrics = AI_TELEMETRY_SCHEMA.metrics;
+const {
+  "pi.ai.request.duration": duration,
+  "pi.ai.tokens": tokens,
+  "pi.ai.cost": cost,
+} = piMetrics;
+const COMPLETION_SCHEMA = defineTelemetrySchema({
+  ...AI_TELEMETRY_SCHEMA,
+  metrics: {
+    ...piMetrics,
+    "pi.ai.request.duration": {
+      ...duration,
+      attributes: { ...duration.attributes, [RESPONSE_MODEL]: responseModel },
+    },
+    "pi.ai.tokens": {
+      ...tokens,
+      attributes: { ...tokens.attributes, [RESPONSE_MODEL]: responseModel },
+    },
+    "pi.ai.cost": {
+      ...cost,
+      attributes: { ...cost.attributes, [RESPONSE_MODEL]: responseModel },
+    },
+  },
+});
 
 /** Pi 1.5.0 ModelRuntime dispatches directly to providers, bypassing Models' native AI observer. */
 function observer(
@@ -20,12 +57,13 @@ function observer(
   context: TelemetryContext,
   reasoning: unknown,
   poll: boolean,
+  policy?: ResponseModelPolicy,
 ): LazyStreamObserver {
   const started = performance.now();
   const labels = { provider: model.provider, model: model.id };
   const metrics = createTypedMetrics(
     context.metrics ?? NOOP_TELEMETRY_METRICS,
-    [AI_TELEMETRY_SCHEMA],
+    [COMPLETION_SCHEMA],
   );
   const duration = metrics.histogram("pi.ai.request.duration");
   const firstDuration = metrics.histogram("pi.ai.first_chunk.duration");
@@ -93,7 +131,15 @@ function observer(
     onResult(message) {
       try {
         if (!message) return;
+        const response = responseModelAttributes(
+          policy,
+          labels.provider,
+          labels.model,
+          message.responseModel,
+        );
+        const completedLabels = { ...labels, ...response };
         span?.setAttributes({
+          ...response,
           stop: message.stopReason,
           "usage.input": message.usage.input,
           "usage.output": message.usage.output,
@@ -108,7 +154,7 @@ function observer(
           });
         duration.record(
           performance.now() - started,
-          { ...labels, stop: message.stopReason },
+          { ...completedLabels, stop: message.stopReason },
           span,
         );
         if (
@@ -122,8 +168,8 @@ function observer(
             ["cache_read", "cacheRead"],
             ["cache_write", "cacheWrite"],
           ] as const)
-            tokens.add(message.usage[key], { ...labels, kind });
-          cost.add(message.usage.cost.total, labels);
+            tokens.add(message.usage[key], { ...completedLabels, kind });
+          cost.add(message.usage.cost.total, completedLabels);
         }
       } catch {
         /* Usage observation is not the durable accounting ledger. */
@@ -143,6 +189,7 @@ function observer(
 export function withModelRuntimeTelemetry<T extends Models>(
   runtime: T,
   telemetry: TelemetryContext,
+  policy?: ResponseModelPolicy,
 ): T {
   // Forward each call exactly as received: every argument, the runtime as the
   // receiver, and one lazy underlying call. Telemetry setup can never block it.
@@ -159,6 +206,7 @@ export function withModelRuntimeTelemetry<T extends Models>(
         options?.telemetry ?? telemetry,
         options && "reasoning" in options ? options.reasoning : undefined,
         poll,
+        policy,
       );
     } catch {
       /* Observer setup must never affect request forwarding. */
@@ -183,22 +231,12 @@ export function withModelRuntimeTelemetry<T extends Models>(
     streamSimple(...args).result();
   const fetchDeferred: Models["fetchDeferred"] = (...args) =>
     streamDeferred(...args).result();
-  const methods = new Map<PropertyKey, unknown>([
-    ["stream", stream],
-    ["streamSimple", streamSimple],
-    ["streamDeferred", streamDeferred],
-    ["complete", complete],
-    ["completeSimple", completeSimple],
-    ["fetchDeferred", fetchDeferred],
-  ]);
-  return new Proxy(runtime, {
-    get(target, key) {
-      if (methods.has(key)) return methods.get(key);
-      const value: unknown = Reflect.get(target, key, target);
-      if (typeof value !== "function" || key === "constructor") return value;
-      const bound: unknown = value.bind(target);
-      methods.set(key, bound);
-      return bound;
-    },
+  return modelsFacade(runtime, {
+    stream,
+    streamSimple,
+    streamDeferred,
+    complete,
+    completeSimple,
+    fetchDeferred,
   });
 }
