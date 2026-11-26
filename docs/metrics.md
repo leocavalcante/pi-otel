@@ -24,6 +24,14 @@ Native Pi units and names are preserved. Prometheus commonly translates dots to 
 | `pi.coding.model.duration`   | histogram, ms   | Assistant-message lifecycle, not native provider request duration            |
 | `pi.coding.tool.results`     | counter         | Tool terminal result; outcome and executed metadata                          |
 
+## Requested and reported models
+
+`provider` and `model` identify the request. With the SDK `responseModels` opt-in, `gen_ai.response.model` identifies the provider's reported model for the configured pair. Only IDs on the reviewed allowlist appear. Prometheus commonly translates the label to `gen_ai_response_model`.
+
+The optional label applies to `pi.ai.request.duration`, `pi.ai.tokens`, `pi.ai.cost`, and the existing model spans and their completion logs. For coding sessions it applies to `pi.coding.model.duration` instead of request duration. Pending and deferred polls still record timing without adding tokens or cost. Errors and aborts can carry the label if the provider already reported a model.
+
+Without an admitted ID, the request still counts and has no response-model label. Do not substitute the requested model in that series. To count logical requests, use the request histogram's count, not its buckets or token counters. First-chunk timing and persisted gauges do not carry the new label.
+
 ## Counters versus durable totals
 
 Live counters start with the exporter process and can lose updates during failures. `observeDurable()` reads `Harness.usage(context)` initially and every 15 seconds, through the supplied owner only. It exports gauges, never adds old totals to new request counters. Failed refresh retains the last successful snapshot, so timestamps can be fresher than the underlying usage read. Removing the observer removes its snapshot.

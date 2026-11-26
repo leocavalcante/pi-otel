@@ -1,7 +1,8 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
+import { setImmediate } from "node:timers/promises";
 import { createPiOtel } from "../src/index.ts";
-import { receiver, spans, metrics } from "./receiver.ts";
+import { labels, receiver, spans, metrics } from "./receiver.ts";
 
 const PRIVATE = "PRIVATE_CONTENT_MUST_NOT_LEAVE_PROCESS";
 test("real OTLP/HTTP exports all signals, strips content/error details, preserves IDs and low-cardinality metrics", async () => {
@@ -42,6 +43,7 @@ test("real OTLP/HTTP exports all signals, strips content/error details, preserve
               provider: "synthetic",
               model: "example-model",
               payload: PRIVATE,
+              "gen_ai.response.model": PRIVATE,
             },
           },
           (span) => {
@@ -60,6 +62,7 @@ test("real OTLP/HTTP exports all signals, strips content/error details, preserve
               kind: "input",
               "task.id": 7,
               prompt: PRIVATE,
+              "gen_ai.response.model": PRIVATE,
             });
             span
               .metrics!.histogram("pi.ai.request.duration", { unit: "ms" })
@@ -139,6 +142,123 @@ test("real OTLP/HTTP exports all signals, strips content/error details, preserve
       ),
     );
   } finally {
+    await otel.shutdown();
+    await sink.close();
+  }
+});
+
+test("coding attribution uses final assistant messages, not updates or tool data", async () => {
+  const sink = await receiver();
+  const A = "fixture/Model.A";
+  const B = "fixture/Model-B";
+  const routed = { provider: "synthetic", model: "router" };
+  const invalidId = `${PRIVATE} invalid model`;
+  const oversizeId = PRIVATE.repeat(8);
+  const otel = createPiOtel({
+    endpoint: sink.endpoint,
+    responseModels: {
+      ...routed,
+      allowedIds: [A, B, invalidId, oversizeId, routed.model],
+    },
+  });
+  const observer = otel.codingObserver();
+  try {
+    observer.handle({ type: "agent_start" });
+    for (const [id, stopReason, input] of [
+      [A, "toolUse", 3],
+      [B, "aborted", 5],
+      [PRIVATE, "stop", 6],
+      [invalidId, "stop", 7],
+      [oversizeId, "stop", 8],
+      [routed.model, "stop", 9],
+    ] as const) {
+      const partial = { role: "assistant", ...routed, responseModel: B };
+      observer.handle({ type: "message_start", message: partial });
+      observer.handle({ type: "message_update", message: partial });
+      const message = {
+        ...partial,
+        stopReason,
+        responseModel: id,
+        usage: {
+          input,
+          output: 4,
+          cacheRead: 2,
+          cacheWrite: 1,
+          cost: { total: 0.25 },
+        },
+        content: PRIVATE,
+        responseId: PRIVATE,
+        errorMessage: PRIVATE,
+      };
+      observer.handle({ type: "message_end", message });
+    }
+    observer.handle({
+      type: "tool_execution_start",
+      toolName: "fixture",
+      toolCallId: "fixture-call",
+    });
+    observer.handle({
+      type: "tool_execution_end",
+      toolName: "fixture",
+      toolCallId: "fixture-call",
+      durationMs: 12,
+    });
+    observer.handle({ type: "agent_settled" });
+    await setImmediate();
+    assert(await otel.forceFlush());
+    const label = "gen_ai.response.model";
+    const records = spans(sink.requests).filter(
+      (span) => span.name === "pi.coding.model",
+    );
+    assert.deepEqual(
+      records.map((span) => labels(span)[label]),
+      [A, B, undefined, undefined, undefined, undefined],
+    );
+    const sent = metrics(sink.requests);
+    const durations = sent.find(
+      (metric) => metric.name === "pi.coding.model.duration",
+    ).histogram.dataPoints;
+    assert.deepEqual(
+      durations.map((point: any) => [
+        labels(point)[label],
+        Number(point.count),
+      ]),
+      [
+        [A, 1],
+        [B, 1],
+        [undefined, 4],
+      ],
+    );
+    const tokens = sent.find((metric) => metric.name === "pi.ai.tokens").sum
+      .dataPoints;
+    const cost = sent.find((metric) => metric.name === "pi.ai.cost").sum
+      .dataPoints;
+    for (const [id, input] of [
+      [A, 3],
+      [B, 5],
+    ] as const) {
+      assert.deepEqual(
+        Object.fromEntries(
+          tokens
+            .filter((point: any) => labels(point)[label] === id)
+            .map((point: any) => [labels(point).kind, Number(point.asDouble)]),
+        ),
+        { input, output: 4, cache_read: 2, cache_write: 1 },
+      );
+      assert.equal(
+        Number(cost.find((point: any) => labels(point)[label] === id).asDouble),
+        0.25,
+      );
+    }
+    assert(!sent.some((metric) => metric.name === "pi.ai.request.duration"));
+    assert(
+      !JSON.stringify(
+        sent.filter((metric) => metric.name.includes("tool")),
+      ).includes(label),
+    );
+    assert(!JSON.stringify(sink.requests).includes(PRIVATE));
+  } finally {
+    observer.close();
     await otel.shutdown();
     await sink.close();
   }

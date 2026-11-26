@@ -99,6 +99,7 @@ See the [model-free Durable example](https://github.com/leocavalcante/pi-otel/bl
 | ---------------------------------- | -------------------------------------------------------------------------- |
 | `telemetry`                        | The telemetry context to pass to a Harness                                 |
 | `modelRuntime(runtime)`            | Wraps an SDK ModelRuntime 1.5.0 so its requests are measured (see below)   |
+| `responseModel`                    | Adds optional response-model labels to native `Models` telemetry           |
 | `observeDurable(harness, context)` | Samples `harness.usage(context)` every 15 seconds; returns a stop function |
 | `observeCodingAgent(session)`      | Observes a coding-agent SDK session; returns an unsubscribe function       |
 | `codingObserver()`                 | The metadata-only event observer that the extension uses                   |
@@ -109,6 +110,31 @@ Your application keeps owning its providers and lifecycle: pi-otel installs no g
 **SDK ModelRuntime 1.5.0.** That runtime sends requests straight to providers, bypassing the instrumented `Models` path. With only `telemetry` passed, Durable phases are recorded but AI request latency and tokens are not. Pass `models: otel.modelRuntime(runtime)` to the same Harness, and wrap it once. Don't wrap `createModels()`, which already emits AI telemetry, or a newer runtime you haven't verified. The wrapper forwards every call unchanged, makes exactly one underlying call per request, and adds no retries or credential handling. Pending deferred polls record timing but not token or cost usage.
 
 **Usage isn't billing.** Pi's persisted `pi.usage` stays the authoritative record for Durable accounting. Pi-reported cost in USD isn't an invoice, and zero can mean an unpriced or subscription model. Task admission isn't answer latency, and a successful tool phase doesn't mean the tool's external effect succeeded.
+
+### Attribute routed responses in the SDK
+
+If a gateway reports which model answered a routed request, add its public ID to existing completion telemetry. `provider` and `model` still name the request. `gen_ai.response.model` names the response, not a specific deployment or revision.
+
+```ts
+import { createModels } from "@earendil-works/pi-ai";
+import { createPiOtel } from "@leocavalcante/pi-otel";
+
+const otel = createPiOtel({
+  serviceName: "my-agent",
+  responseModels: {
+    provider: "example-gateway",
+    model: "router",
+    allowedIds: ["example/Model-A", "example/Model-B"],
+  },
+});
+const { nativeModels, report } = otel.responseModel;
+const models = nativeModels(createModels());
+```
+
+- **Native `createModels()`.** Give your provider the `report` callback and register the provider with `models.setProvider()`. In `onProviderStreamEvent`, report the first nonempty model ID that differs from the request using `report(options?.telemetry, id)`. Pass `models` and `otel.telemetry` to the Harness. The facade uses the request's existing telemetry parent. Calls without one stay uninstrumented. Do not use `modelRuntime()` on this path.
+- **SDK ModelRuntime and coding sessions.** Use `otel.modelRuntime(runtime)` or `otel.observeCodingAgent(session)` as before. Both read the final assistant message's `responseModel` without a provider callback. The standalone Pi extension does not configure this SDK opt-in.
+
+Include only reviewed public model IDs in `allowedIds`. Missing, unlisted, and rejected values leave the label absent, without hiding the request or changing its result. First-chunk timing and persisted usage totals stay keyed to the requested model. To turn attribution off, omit `responseModels`.
 
 ### Collector and dashboard examples
 
@@ -132,7 +158,7 @@ pi-otel sends OTLP as JSON over HTTP or HTTPS, with one exporter per signal. It 
 | `OTEL_METRIC_EXPORT_INTERVAL`                       | Metric export interval in milliseconds. Default 15000; minimum 1000.                   |
 | `OTEL_SDK_DISABLED`                                 | Set to `true` to turn pi-otel off.                                                     |
 
-In the SDK, the `endpoint`, `serviceName`, `serviceNamespace`, and `serviceVersion` options override the base environment variables; per-signal endpoints still win.
+In the SDK, the `endpoint`, `serviceName`, `serviceNamespace`, and `serviceVersion` options override the base environment variables; per-signal endpoints still win. Set `responseModels` in SDK code only. It applies to one exact provider/model pair, with up to 128 allowlist entries of at most 128 characters each.
 
 - **Endpoints.** URLs with embedded credentials, query strings, or fragments are rejected. Use HTTPS with normal certificate verification for remote receivers.
 - **Limits.** Batch queues hold up to 512 spans and 512 logs, and each export has a 5-second deadline. Crashes, queue pressure, network failures, and shutdown can lose telemetry.

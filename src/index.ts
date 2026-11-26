@@ -25,12 +25,18 @@ import type { Models } from "@earendil-works/pi-ai";
 import { withModelRuntimeTelemetry } from "./model-runtime.ts";
 import { OtelAdapter } from "./adapter.ts";
 import {
+  createResponseModelAttribution,
+  type ResponseModelAttribution,
+} from "./response-model.ts";
+import {
   SPANS,
   pick,
   safeSpan,
   metricAttributes,
   eventAttributes,
   errorCategory,
+  responseModelPolicy,
+  type ResponseModelsOptions,
 } from "./privacy.ts";
 import {
   codingObserver,
@@ -44,6 +50,8 @@ export interface PiOtelOptions {
   serviceVersion?: string;
   /** OTLP/HTTP base URL. Standard signal-specific OTEL environment variables are also supported. */
   endpoint?: string;
+  /** Opt in to response-model labels for one requested provider/model pair. */
+  responseModels?: ResponseModelsOptions;
 }
 export interface UsageValue {
   input: number;
@@ -58,6 +66,7 @@ export interface UsageState {
 }
 export interface PiOtel {
   readonly telemetry: TelemetryContext;
+  readonly responseModel: ResponseModelAttribution;
   /** SDK ModelRuntime 1.5.0 compatibility. Do not wrap already-instrumented createModels(). */
   modelRuntime<T extends Models>(runtime: T): T;
   /** Read totals through the existing owner only; never opens storage or another Harness. */
@@ -115,6 +124,9 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
     }),
   );
   const disabled = process.env.OTEL_SDK_DISABLED === "true";
+  const policy = responseModelPolicy(
+    disabled ? undefined : options.responseModels,
+  );
   const resource = resourceFromAttributes({
     "service.name": identity(
       options.serviceName ?? process.env.OTEL_SERVICE_NAME ?? "pi-agent",
@@ -189,7 +201,10 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
   });
   const safeExporter: SpanExporter = {
     export: (spans, callback) => {
-      traceExporter.export(spans.map(safeSpan), checked("traces", callback));
+      traceExporter.export(
+        spans.map((span) => safeSpan(span, policy)),
+        checked("traces", callback),
+      );
     },
     shutdown: () => traceExporter.shutdown(),
     forceFlush: () => traceExporter.forceFlush(),
@@ -247,7 +262,8 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
   const telemetry = new OtelAdapter({
     tracer: tracers.getTracer("@leocavalcante/pi-otel", "0.1.2"),
     meter,
-    metricAttributes,
+    metricAttributes: (name, attributes) =>
+      metricAttributes(name, attributes, policy),
     onEvent: (name, attributes, context) => {
       const safe = eventAttributes(name, attributes);
       if (safe)
@@ -260,7 +276,7 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
     },
     onEnd: ({ name, attributes, status, duration, context, native }) => {
       if (!SPANS[name]) return;
-      const safe = pick(attributes, SPANS[name]);
+      const safe = pick(attributes, SPANS[name], policy);
       if (status.status === "error") {
         safe["error.type"] = errorCategory(status.error?.name);
         native.setAttribute("error.type", safe["error.type"]);
@@ -353,7 +369,9 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
   let closing: Promise<boolean> | undefined;
   const api: PiOtel = {
     telemetry,
-    modelRuntime: (runtime) => withModelRuntimeTelemetry(runtime, telemetry),
+    responseModel: createResponseModelAttribution(policy),
+    modelRuntime: (runtime) =>
+      withModelRuntimeTelemetry(runtime, telemetry, policy),
     async observeDurable(harness, context) {
       if (disabled || closing) return () => undefined;
       // Kept outside narrowable locals: stop() can run while a read awaits, and the
@@ -415,7 +433,7 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
       cleanup.add(stop);
       return stop;
     },
-    codingObserver: () => codingObserver(telemetry, meter),
+    codingObserver: () => codingObserver(telemetry, meter, policy),
     observeCodingAgent(source) {
       const observer = api.codingObserver();
       const unsubscribe = source.subscribe((event) => {
@@ -465,3 +483,5 @@ export function createPiOtel(options: PiOtelOptions = {}): PiOtel {
   return api;
 }
 export type { CodingEvent, CodingSource } from "./coding.ts";
+export type { ResponseModelsOptions } from "./privacy.ts";
+export type { ResponseModelAttribution } from "./response-model.ts";
